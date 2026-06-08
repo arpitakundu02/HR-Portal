@@ -1,0 +1,13 @@
+# .gitignore for HR Portal Backend
+.env
+__pycache__/
+*.pyc
+*.pyo
+uploads/*.pdf
+uploads/*.doc
+uploads/*.docx
+*.db
+*.sqlite3
+venv/
+.venv/
+instance/
