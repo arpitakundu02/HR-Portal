@@ -21,7 +21,7 @@ import {
 import { MapContainer, TileLayer, Marker, Circle, useMap, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ClockIcon, MapPinIcon, SignalIcon, RulerIcon, ShieldCheckIcon, FlagIcon, RefreshIcon, InboxIcon, HourglassIcon, ShieldAlertIcon, CheckIcon, CloseIcon, DownloadIcon, CalendarIcon, PlusIcon, ClipboardCheckIcon } from '../components/common/Icons';
+import { ClockIcon, MapPinIcon, SignalIcon, RulerIcon, ShieldCheckIcon, FlagIcon, RefreshIcon, InboxIcon, HourglassIcon, ShieldAlertIcon, CheckIcon, DownloadIcon, CalendarIcon, PlusIcon, ClipboardCheckIcon } from '../components/common/Icons';
 
 // Fix custom icon classes to display properly on the interactive map
 const blueIcon = L.divIcon({
@@ -273,10 +273,6 @@ export default function Attendance() {
     isCheckedIn  ? 'checked-in'  :
     isCheckedOut ? 'checked-out' : 'not-checked';
 
-  const dotEmoji =
-    isCheckedIn  ? '✅' :
-    isCheckedOut ? '🏁' : '⏰';
-
   // Format utility using browser's local timezone
   const formatLocalDateTime = (dateStr) => {
     const date = parseUTCDate(dateStr);
@@ -327,9 +323,29 @@ export default function Attendance() {
           {/* Check-in Panel (All users) */}
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="checkin-panel">
-              <div className={`checkin-status-dot ${dotClass}`}>
-                {isCheckedIn ? <CheckIcon style={{ width: 16, height: 16, color: '#fff' }} /> : isCheckedOut ? <FlagIcon style={{ width: 16, height: 16, color: '#fff' }} /> : <ClockIcon style={{ width: 16, height: 16, color: '#fff' }} />}
-              </div>
+              <button 
+                className={`checkin-status-dot ${dotClass}`} 
+                onClick={isCheckedIn ? handleCheckOut : !isCheckedOut ? handleCheckIn : undefined}
+                disabled={checkingIn || isCheckedOut}
+                style={{ border: 'none', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '15px', fontWeight: '700' }}
+              >
+                {isCheckedIn ? (
+                  <>
+                    <CheckIcon style={{ width: 44, height: 44, color: '#fff' }} />
+                    <span>Check Out</span>
+                  </>
+                ) : isCheckedOut ? (
+                  <>
+                    <FlagIcon style={{ width: 44, height: 44, color: '#fff' }} />
+                    <span>Checked Out</span>
+                  </>
+                ) : (
+                  <>
+                    <ClockIcon style={{ width: 44, height: 44, color: '#fff' }} />
+                    <span>{checkingIn ? 'Checking...' : 'Check In'}</span>
+                  </>
+                )}
+              </button>
 
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -484,16 +500,6 @@ export default function Attendance() {
               </div>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                {!status?.check_in && (
-                  <button className="btn btn-success btn-lg" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }} onClick={handleCheckIn} disabled={checkingIn}>
-                    <MapPinIcon /> {checkingIn ? 'Getting location…' : 'Check In'}
-                  </button>
-                )}
-                {isCheckedIn && (
-                  <button className="btn btn-danger btn-lg" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }} onClick={handleCheckOut} disabled={checkingIn}>
-                    <FlagIcon /> {checkingIn ? 'Processing…' : 'Check Out'}
-                  </button>
-                )}
                 <button className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }} onClick={() => trackUserLocation(officeSettings)}>
                   <RefreshIcon /> Refresh Location
                 </button>
@@ -667,10 +673,17 @@ function EmployeeRegularization() {
     }
     setSubmitting(true);
     try {
+      let checkOutDate = dateVal;
+      if (checkInTime && checkOutTime && checkOutTime <= checkInTime) {
+        const d = new Date(`${dateVal}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + 1);
+        checkOutDate = d.toISOString().split('T')[0];
+      }
+
       const payload = {
         date: dateVal,
         check_in: checkInTime ? `${dateVal}T${checkInTime}:00` : null,
-        check_out: checkOutTime ? `${dateVal}T${checkOutTime}:00` : null,
+        check_out: checkOutTime ? `${checkOutDate}T${checkOutTime}:00` : null,
         reason
       };
       await createRegularizationRequest(payload);
@@ -739,6 +752,11 @@ function EmployeeRegularization() {
               />
             </div>
           </div>
+          {checkInTime && checkOutTime && checkOutTime <= checkInTime && (
+            <div className="alert alert-info" style={{ marginBottom: '16px', padding: '8px 12px', fontSize: 13 }}>
+              Overnight shift detected. Check-out will be recorded on the following day.
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">Reason for Adjustment <span style={{ color: 'var(--danger)' }}>*</span> (Min 10 characters)</label>
             <textarea

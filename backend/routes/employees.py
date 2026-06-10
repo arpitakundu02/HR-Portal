@@ -40,6 +40,61 @@ def _auto_employee_id() -> str:
     return f"HR-{next_num:03d}"
 
 
+def _get_company_date():
+    """Return the current date in Asia/Kolkata (IST) timezone."""
+    import datetime as dt
+    kolkata_tz = dt.timezone(dt.timedelta(hours=5, minutes=30))
+    return dt.datetime.now(kolkata_tz).date()
+
+
+def _get_availability_status(user_obj) -> str:
+    """Calculate the availability status of a user for the current date."""
+    from models import Leave, Attendance
+    today = _get_company_date()
+    approved_leave = Leave.query.filter(
+        Leave.employee_id == user_obj.id,
+        Leave.status == "Approved",
+        Leave.start_date <= today,
+        Leave.end_date >= today
+    ).first()
+
+    if approved_leave:
+        if approved_leave.leave_type == "APL":
+            return "On Leave"
+        elif approved_leave.leave_type == "WFH":
+            return "Work From Home"
+    else:
+        att = Attendance.query.filter_by(employee_id=user_obj.id, date=today).first()
+        if att and att.check_in:
+            if not att.check_out:
+                return "Present"
+    return "Unavailable"
+
+
+def _get_upcoming_leave(user_obj):
+    """Get the closest future approved leave details for the user."""
+    from models import Leave
+    today = _get_company_date()
+    next_leave = Leave.query.filter(
+        Leave.employee_id == user_obj.id,
+        Leave.status == "Approved",
+        Leave.start_date > today
+    ).order_by(Leave.start_date.asc()).first()
+
+    if not next_leave:
+        return None
+
+    days_until_start = (next_leave.start_date - today).days
+
+    return {
+        "leave_type": next_leave.leave_type,
+        "start_date": next_leave.start_date.isoformat(),
+        "end_date": next_leave.end_date.isoformat(),
+        "days_until_start": days_until_start
+    }
+
+
+
 # ------------------------------------------------------------------
 # GET /api/employees
 # ------------------------------------------------------------------
@@ -105,41 +160,15 @@ def list_employees(current_user_id, current_user_role):
 
     pagination = query.order_by(User.name).paginate(page=page, per_page=per_page, error_out=False)
 
+    employees = []
     if current_user_role == "Admin":
-        employees = [
-            e.to_dict(include_sensitive=True)
-            for e in pagination.items
-        ]
-    else:
-        # Determine availability statuses
-        today = date.today()
-        employees = []
         for e in pagination.items:
-            # Availability status rules:
-            # 1. On Leave: if there is an approved Leave record for today (start_date <= today <= end_date) and leave_type is APL
-            # 2. Work From Home: if there is an approved WFH Leave record for today, or if they checked in and checked in from home (wait, WFH is standardly managed as a leave_type "WFH" in the leaves table)
-            # 3. Present: if they have checked in today and do not have an approved leave.
-            # 4. Unavailable: if not checked in today and no approved leave.
-            from models import Leave, Attendance
-            approved_leave = Leave.query.filter(
-                Leave.employee_id == e.id,
-                Leave.status == "Approved",
-                Leave.start_date <= today,
-                Leave.end_date >= today
-            ).first()
-
-            avail_status = "Unavailable"
-            if approved_leave:
-                if approved_leave.leave_type == "APL":
-                    avail_status = "On Leave"
-                elif approved_leave.leave_type == "WFH":
-                    avail_status = "Work From Home"
-            else:
-                # Check today's attendance
-                att = Attendance.query.filter_by(employee_id=e.id, date=today).first()
-                if att and att.check_in:
-                    avail_status = "Present"
-
+            emp_data = e.to_dict(include_sensitive=True)
+            emp_data["availability_status"] = _get_availability_status(e)
+            emp_data["upcoming_leave"] = _get_upcoming_leave(e)
+            employees.append(emp_data)
+    else:
+        for e in pagination.items:
             employees.append({
                 "id": e.id,
                 "name": e.name,
@@ -149,7 +178,8 @@ def list_employees(current_user_id, current_user_role):
                 "rank": e.rank,
                 "role": e.role,
                 "is_active": e.is_active,
-                "availability_status": avail_status
+                "availability_status": _get_availability_status(e),
+                "upcoming_leave": _get_upcoming_leave(e)
             })
 
     return jsonify({
@@ -157,6 +187,47 @@ def list_employees(current_user_id, current_user_role):
         "total": pagination.total,
         "page": page,
         "pages": pagination.pages,
+    }), 200
+
+# ------------------------------------------------------------------
+# GET /api/employees/stats
+# ------------------------------------------------------------------
+@employees_bp.route("/stats", methods=["GET"])
+@admin_required
+def get_employee_stats(current_user_id, current_user_role):
+    """
+    Get aggregated employee statistics for the dashboard.
+    Returns active employees count and distribution by department.
+    """
+    from sqlalchemy import func
+    from models import Department
+    
+    # Count active employees
+    active_count = User.query.filter_by(is_active=True).count()
+    
+    # Query department distribution for active employees
+    # Using group_by and outer join to also count employees with no department
+    results = db.session.query(
+        Department.name,
+        func.count(User.id)
+    ).select_from(User).outerjoin(
+        Department, User.department_id == Department.id
+    ).filter(
+        User.is_active == True
+    ).group_by(
+        User.department_id, Department.name
+    ).all()
+    
+    distribution = []
+    for dept_name, count in results:
+        distribution.append({
+            "name": dept_name if dept_name is not None else "Unassigned",
+            "count": count
+        })
+        
+    return jsonify({
+        "active_employees": active_count,
+        "department_distribution": distribution
     }), 200
 
 
@@ -188,6 +259,12 @@ def create_employee(current_user_id, current_user_role):
     # Hash password
     pw_hash = bcrypt.hashpw(data["password"].encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
+    manager_id = data.get("manager_id")
+    if manager_id:
+        manager = User.query.get(manager_id)
+        if not manager or not manager.is_active:
+            return jsonify({"error": "Selected manager does not exist or is inactive."}), 422
+
     employee = User(
         employee_id=data.get("employee_id") or _auto_employee_id(),
         email=email,
@@ -205,6 +282,7 @@ def create_employee(current_user_id, current_user_role):
         date_of_joining=data.get("date_of_joining"),
         salary=data.get("salary"),
         rank=data.get("rank"),
+        manager_id=manager_id,
         aadhar_number=data.get("aadhar_number"),
     )
     db.session.add(employee)
@@ -255,28 +333,6 @@ def get_employee(emp_id, current_user_id, current_user_role):
         if not user or user.department_id != employee.department_id or not user.department_id:
             return jsonify({"error": "Access denied."}), 403
 
-        # Availability status calculation
-        from datetime import date
-        from models import Leave, Attendance
-        today = date.today()
-        approved_leave = Leave.query.filter(
-            Leave.employee_id == employee.id,
-            Leave.status == "Approved",
-            Leave.start_date <= today,
-            Leave.end_date >= today
-        ).first()
-
-        avail_status = "Unavailable"
-        if approved_leave:
-            if approved_leave.leave_type == "APL":
-                avail_status = "On Leave"
-            elif approved_leave.leave_type == "WFH":
-                avail_status = "Work From Home"
-        else:
-            att = Attendance.query.filter_by(employee_id=employee.id, date=today).first()
-            if att and att.check_in:
-                avail_status = "Present"
-
         return jsonify({
             "id": employee.id,
             "name": employee.name,
@@ -286,10 +342,14 @@ def get_employee(emp_id, current_user_id, current_user_role):
             "rank": employee.rank,
             "role": employee.role,
             "is_active": employee.is_active,
-            "availability_status": avail_status
+            "availability_status": _get_availability_status(employee),
+            "upcoming_leave": _get_upcoming_leave(employee)
         }), 200
 
-    return jsonify(employee.to_dict(include_sensitive=(current_user_role == "Admin"))), 200
+    emp_data = employee.to_dict(include_sensitive=(current_user_role == "Admin" or current_user_id == emp_id))
+    emp_data["availability_status"] = _get_availability_status(employee)
+    emp_data["upcoming_leave"] = _get_upcoming_leave(employee)
+    return jsonify(emp_data), 200
 
 
 # ------------------------------------------------------------------
@@ -322,6 +382,29 @@ def update_employee(emp_id, current_user_id, current_user_role):
             if field in data:
                 setattr(employee, field, data[field])
 
+        if "manager_id" in data:
+            m_id = data["manager_id"]
+            if m_id:
+                if m_id == employee.id:
+                    return jsonify({"error": "An employee cannot be their own manager."}), 422
+                
+                # Check for circular reporting chain
+                visited = set()
+                curr_id = m_id
+                while curr_id:
+                    if curr_id == employee.id:
+                        return jsonify({"error": "Circular reporting chain detected."}), 422
+                    if curr_id in visited:
+                        break
+                    visited.add(curr_id)
+                    curr_mgr = User.query.get(curr_id)
+                    curr_id = curr_mgr.manager_id if curr_mgr else None
+
+                manager = User.query.get(m_id)
+                if not manager or not manager.is_active:
+                    return jsonify({"error": "Selected manager does not exist or is inactive."}), 422
+            employee.manager_id = m_id
+
         # Allow password reset by admin
         if data.get("password"):
             employee.password_hash = bcrypt.hashpw(
@@ -345,11 +428,19 @@ def update_employee(emp_id, current_user_id, current_user_role):
 @admin_required
 def delete_employee(emp_id, current_user_id, current_user_role):
     """Admin-only: Soft-delete an employee (sets is_active = False)."""
+    from models import Department
     employee = User.query.get_or_404(emp_id)
     if employee.id == current_user_id:
         return jsonify({"error": "Admin cannot deactivate their own account."}), 400
 
     employee.is_active = False
+    
+    # Safely handle direct reports by setting their manager to NULL
+    User.query.filter_by(manager_id=employee.id).update({User.manager_id: None})
+    
+    # Safely handle department manager references by setting them to NULL
+    Department.query.filter_by(manager_id=employee.id).update({Department.manager_id: None})
+    
     db.session.commit()
     return jsonify({"message": f"Employee '{employee.name}' has been deactivated."}), 200
 

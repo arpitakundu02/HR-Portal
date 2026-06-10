@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react';
 import StatCard from '../components/common/StatCard';
 import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
-import { getLeaveBalances, getTodayStatus, getTasks, getMeetings } from '../services/api';
+import AnnouncementWidget from '../components/common/AnnouncementWidget';
+import { getLeaveBalances, getTodayStatus, getTasks, getMeetings, getHolidays } from '../services/api';
 import { useToast } from '../components/common/Toast';
 import { DocumentTextIcon, HomeIcon, ClipboardCheckIcon, UserGroupIcon, InboxIcon, ClockIcon, CalendarIcon, CheckIcon, UsersIcon } from '../components/common/Icons';
 
@@ -17,21 +18,24 @@ export default function EmployeeDashboard() {
   const [attendance, setAttendance] = useState(null);
   const [tasks,      setTasks]      = useState([]);
   const [meetings,   setMeetings]   = useState([]);
+  const [holidays,   setHolidays]   = useState([]);
   const [loading,    setLoading]    = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [balRes, attRes, taskRes, meetRes] = await Promise.all([
+        const [balRes, attRes, taskRes, meetRes, holRes] = await Promise.all([
           getLeaveBalances(),
           getTodayStatus(),
           getTasks({ status: 'Pending' }),
           getMeetings({ upcoming: true }),
+          getHolidays({ upcoming: true, limit: 3 })
         ]);
         setBalances(balRes.data);
         setAttendance(attRes.data);
         setTasks(taskRes.data.tasks || []);
         setMeetings(meetRes.data || []);
+        setHolidays(holRes.data || []);
       } catch {
         toast.error('Failed to load dashboard data.');
       } finally {
@@ -56,6 +60,8 @@ export default function EmployeeDashboard() {
         <StatCard icon={<ClipboardCheckIcon />} value={tasks.length}                  label="Pending Tasks"       color="#f59e0b" />
         <StatCard icon={<UserGroupIcon />} value={meetings.length}               label="Upcoming Meetings"   color="#38bdf8" />
       </div>
+
+      <AnnouncementWidget />
 
       <div className="grid-2" style={{ marginBottom: 24 }}>
         {/* Today's Attendance */}
@@ -164,7 +170,7 @@ export default function EmployeeDashboard() {
       </div>
 
       {/* Upcoming Meetings */}
-      <div className="card">
+      <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <UsersIcon style={{ width: 16, height: 16 }} /> Upcoming Meetings
@@ -197,6 +203,42 @@ export default function EmployeeDashboard() {
               {m.link && (
                 <a href={m.link} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">Join</a>
               )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Upcoming Holidays Widget */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <CalendarIcon style={{ width: 16, height: 16 }} /> Upcoming Holidays
+          </div>
+        </div>
+        {holidays.length === 0 ? (
+          <div className="empty-state" style={{ padding: 30 }}>
+            <div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div>
+            <h3>No upcoming holidays</h3>
+          </div>
+        ) : (
+          holidays.map((h) => (
+            <div key={h.id} style={{
+              display: 'flex', gap: 14, padding: '14px 0',
+              borderBottom: '1px solid var(--border)',
+            }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 10,
+                background: 'var(--accent-glow)', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', flexShrink: 0,
+              }}>
+                <CalendarIcon style={{ width: 20, height: 20, color: 'var(--accent-light)' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{h.name}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {new Date(h.date).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+              </div>
             </div>
           ))
         )}

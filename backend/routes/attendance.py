@@ -20,6 +20,14 @@ from utils.geo import is_within_office_radius
 attendance_bp = Blueprint("attendance", __name__)
 
 
+def _get_company_date():
+    """Return the current date in Asia/Kolkata (IST) timezone."""
+    import datetime as dt
+    kolkata_tz = dt.timezone(dt.timedelta(hours=5, minutes=30))
+    return dt.datetime.now(kolkata_tz).date()
+
+
+
 # ------------------------------------------------------------------
 # GET /api/attendance/status
 # ------------------------------------------------------------------
@@ -27,8 +35,14 @@ attendance_bp = Blueprint("attendance", __name__)
 @jwt_required
 def today_status(current_user_id, current_user_role):
     """Return the current employee's attendance record for today."""
-    today = date.today()
+    today = _get_company_date()
     record = Attendance.query.filter_by(employee_id=current_user_id, date=today).first()
+    if not record:
+        import datetime as dt
+        yesterday = today - dt.timedelta(days=1)
+        prev_record = Attendance.query.filter_by(employee_id=current_user_id, date=yesterday).first()
+        if prev_record and not prev_record.check_out:
+            record = prev_record
 
     if not record:
         return jsonify({
@@ -104,8 +118,15 @@ def check_in(current_user_id, current_user_role):
             }
         }), 403
 
-    today = date.today()
+    today = _get_company_date()
     existing = Attendance.query.filter_by(employee_id=current_user_id, date=today).first()
+
+    # Block check-in if there is an active unchecked-out shift from yesterday
+    import datetime as dt
+    yesterday = today - dt.timedelta(days=1)
+    prev_record = Attendance.query.filter_by(employee_id=current_user_id, date=yesterday).first()
+    if prev_record and not prev_record.check_out:
+        return jsonify({"error": "You have an active checked-in shift from yesterday. Please check out first."}), 409
 
     if existing and existing.check_in:
         return jsonify({"error": "Already checked in for today."}), 409
@@ -140,8 +161,12 @@ def check_out(current_user_id, current_user_role):
     Automatically calculates total working hours.
     No geolocation required for check-out.
     """
-    today = date.today()
+    today = _get_company_date()
     record = Attendance.query.filter_by(employee_id=current_user_id, date=today).first()
+    if not record:
+        import datetime as dt
+        yesterday = today - dt.timedelta(days=1)
+        record = Attendance.query.filter_by(employee_id=current_user_id, date=yesterday).first()
 
     if not record or not record.check_in:
         return jsonify({"error": "No check-in found for today. Please check in first."}), 400
@@ -299,6 +324,46 @@ def update_settings(current_user_id, current_user_role):
         "updated_at": settings_to_update["office_updated_at"]
     }), 200
 
+# ------------------------------------------------------------------
+# GET /api/attendance/stats
+# ------------------------------------------------------------------
+@attendance_bp.route("/stats", methods=["GET"])
+@admin_required
+def get_attendance_stats(current_user_id, current_user_role):
+    """
+    Get aggregated attendance statistics for today.
+    Returns present and absent count for active employees (or all employees if include_inactive=true).
+    """
+    from sqlalchemy import func
+    
+    today = _get_company_date()
+    include_inactive = request.args.get("include_inactive", "false").lower() == "true"
+    
+    # Base user query for total head count
+    user_query = User.query
+    if not include_inactive:
+        user_query = user_query.filter_by(is_active=True)
+    total_users_count = user_query.count()
+    
+    # Query present employees today
+    present_query = db.session.query(func.count(Attendance.id)).join(
+        User, Attendance.employee_id == User.id
+    ).filter(
+        Attendance.date == today,
+        Attendance.check_in != None
+    )
+    
+    if not include_inactive:
+        present_query = present_query.filter(User.is_active == True)
+        
+    present_today = present_query.scalar() or 0
+    absent_today = max(0, total_users_count - present_today)
+    
+    return jsonify({
+        "present_today": present_today,
+        "absent_today": absent_today
+    }), 200
+
 
 # ------------------------------------------------------------------
 # POST /api/attendance/test_email_config
@@ -397,11 +462,11 @@ def create_regularization(current_user_id, current_user_role):
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 422
 
     # Check future date
-    if req_date > date.today():
+    if req_date > _get_company_date():
         return jsonify({"error": "Regularization requests for future dates are rejected."}), 422
 
     # Check older than 30 days
-    days_ago = (date.today() - req_date).days
+    days_ago = (_get_company_date() - req_date).days
     if days_ago > 30:
         return jsonify({"error": "Regularization requests are restricted to dates within the last 30 days."}), 422
 
@@ -416,11 +481,15 @@ def create_regularization(current_user_id, current_user_role):
 
     # Check monthly request limit (all statuses: Pending, Approved, Rejected)
     # Count requests created in the current calendar month
-    today = date.today()
-    start_of_month = datetime(today.year, today.month, 1)
+    import datetime as dt
+    company_today = _get_company_date()
+    local_start = dt.datetime(company_today.year, company_today.month, 1, 0, 0, 0)
+    kolkata_tz = dt.timezone(dt.timedelta(hours=5, minutes=30))
+    start_of_month_utc = local_start.replace(tzinfo=kolkata_tz).astimezone(dt.timezone.utc).replace(tzinfo=None)
+
     monthly_count = AttendanceAdjustment.query.filter(
         AttendanceAdjustment.employee_id == current_user_id,
-        AttendanceAdjustment.created_at >= start_of_month
+        AttendanceAdjustment.created_at >= start_of_month_utc
     ).count()
 
     if monthly_count >= 4:
@@ -507,6 +576,9 @@ def action_regularization(id, current_user_id, current_user_role):
     req = AttendanceAdjustment.query.get(id)
     if not req:
         return jsonify({"error": "Regularization request not found."}), 404
+
+    if req.employee_id == current_user_id:
+        return jsonify({"error": "Access denied. You cannot approve your own regularization request."}), 403
 
     if req.status != "Pending":
         return jsonify({"error": "This request has already been actioned."}), 400

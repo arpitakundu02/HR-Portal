@@ -17,26 +17,33 @@ import {
   AcademyIcon,
   UserIcon,
   LogoutIcon,
+  MegaphoneIcon,
 } from '../common/Icons';
 
 const ADMIN_NAV = [
   { label: 'Dashboard',    path: '/dashboard',   icon: ChartBarIcon },
+  { label: 'Announcements', path: '/announcements', icon: MegaphoneIcon },
   { label: 'Employees',    path: '/employees',   icon: UsersIcon },
   { label: 'Departments',  path: '/departments', icon: BuildingIcon },
   { label: 'Leaves',       path: '/leaves',      icon: CalendarIcon },
   { label: 'Attendance',   path: '/attendance',  icon: ClockIcon },
   { label: 'Tasks',        path: '/tasks',       icon: ClipboardCheckIcon },
   { label: 'Meetings',     path: '/meetings',    icon: UserGroupIcon },
+  { label: 'Holidays',     path: '/holidays',    icon: CalendarIcon },
+  { label: 'Work Transfers', path: '/work-transfers', icon: UsersIcon },
   { label: 'Settings',     path: '/settings',    icon: CogIcon },
 ];
 
 const EMPLOYEE_NAV = [
   { label: 'Dashboard',    path: '/dashboard',   icon: ChartBarIcon },
+  { label: 'Announcements', path: '/announcements', icon: MegaphoneIcon },
   { label: 'Employees',    path: '/employees',   icon: UsersIcon },
   { label: 'Leaves',       path: '/leaves',      icon: CalendarIcon },
   { label: 'Attendance',   path: '/attendance',  icon: ClockIcon },
   { label: 'Tasks',        path: '/tasks',       icon: ClipboardCheckIcon },
   { label: 'Meetings',     path: '/meetings',    icon: UserGroupIcon },
+  { label: 'Holidays',     path: '/holidays',    icon: CalendarIcon },
+  { label: 'Work Transfers', path: '/work-transfers', icon: UsersIcon },
 ];
 
 export default function Sidebar() {

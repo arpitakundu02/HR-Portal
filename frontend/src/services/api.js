@@ -45,6 +45,7 @@ export const getMe      = ()       => api.get('/auth/me');
    EMPLOYEES
    ================================================================ */
 export const getEmployees   = (params)      => api.get('/employees/', { params });
+export const getEmployeeStats = ()          => api.get('/employees/stats');
 export const getEmployee    = (id)          => api.get(`/employees/${id}`);
 export const createEmployee = (data)        => api.post('/employees/', data);
 export const updateEmployee = (id, data)    => api.put(`/employees/${id}`, data);
@@ -73,6 +74,7 @@ export const assignLeaveBalance  = (data)         => api.post('/leaves/balances'
 export const applyLeave          = (data)         => api.post('/leaves/apply', data);
 export const getLeaveHistory     = (params)       => api.get('/leaves/history', { params });
 export const getLeaveRequests    = (params)       => api.get('/leaves/requests', { params });
+export const getLeaveStats       = ()             => api.get('/leaves/stats');
 export const actionLeaveRequest  = (id, status)   => api.post(`/leaves/requests/${id}/action`, { status });
 
 /* ================================================================
@@ -82,6 +84,7 @@ export const getTodayStatus       = ()        => api.get('/attendance/status');
 export const checkIn              = (coords)  => api.post('/attendance/checkin', coords);
 export const checkOut             = ()        => api.post('/attendance/checkout');
 export const getAttendanceHistory = (params)  => api.get('/attendance/history', { params });
+export const getAttendanceStats   = ()         => api.get('/attendance/stats');
 export const getOfficeSettings    = ()        => api.get('/attendance/settings');
 export const updateOfficeSettings = (data)    => api.post('/attendance/settings', data);
 
@@ -97,6 +100,7 @@ export const deleteMeeting  = (id)          => api.delete(`/meetings/${id}`);
    TASKS
    ================================================================ */
 export const getTasks    = (params)      => api.get('/tasks/', { params });
+export const getTaskStats = ()           => api.get('/tasks/stats');
 export const createTask  = (data)        => api.post('/tasks/', data);
 export const updateTask  = (id, data)    => api.put(`/tasks/${id}`, data);
 export const deleteTask  = (id)          => api.delete(`/tasks/${id}`);
@@ -108,4 +112,36 @@ export const getRegularizationHistory  = ()                     => api.get('/att
 export const createRegularizationRequest = (data)               => api.post('/attendance/regularization', data);
 export const actionRegularizationRequest = (id, status, comment) => api.post(`/attendance/regularization/${id}/action`, { status, comment });
 
+/* ================================================================
+   HOLIDAYS
+   ================================================================ */
+export const getHolidays    = (params) => api.get('/holidays', { params });
+export const createHoliday  = (data)   => api.post('/holidays', data);
+export const updateHoliday  = (id, data) => api.put(`/holidays/${id}`, data);
+export const deleteHoliday  = (id)     => api.delete(`/holidays/${id}`);
+
+/* ================================================================
+   NOTIFICATIONS
+   ================================================================ */
+export const getNotifications            = (params) => api.get('/notifications/', { params });
+export const getNotificationsUnreadCount = ()       => api.get('/notifications/unread-count');
+export const markNotificationRead        = (id)     => api.post(`/notifications/${id}/read`);
+export const markAllNotificationsRead    = ()       => api.post('/notifications/read-all');
+
+/* ================================================================
+   ANNOUNCEMENTS
+   ================================================================ */
+export const getAnnouncements       = ()       => api.get('/announcements/');
+export const getActiveAnnouncements = ()       => api.get('/announcements/active');
+export const createAnnouncement     = (data)   => api.post('/announcements/', data);
+export const updateAnnouncement     = (id, data) => api.put(`/announcements/${id}`, data);
+export const deleteAnnouncement     = (id)     => api.delete(`/announcements/${id}`);
+
+/* ================================================================
+   WORK TRANSFERS / DELEGATIONS
+   ================================================================ */
+export const getWorkTransfers       = ()       => api.get('/work-transfers/');
+export const createWorkTransfer     = (data)   => api.post('/work-transfers/', data);
+
 export default api;
+

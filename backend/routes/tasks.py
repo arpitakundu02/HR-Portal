@@ -47,7 +47,28 @@ def list_tasks(current_user_id, current_user_role):
         if emp_id := request.args.get("employee_id", type=int):
             query = query.filter_by(employee_id=emp_id)
     else:
-        query = Task.query.filter_by(employee_id=current_user_id)
+        from datetime import date
+        from models import WorkTransferRequest
+        today = date.today()
+        # Find users who have actively delegated tasks to the current user
+        delegated_users = db.session.query(WorkTransferRequest.requester_id).filter(
+            WorkTransferRequest.delegate_to_id == current_user_id,
+            WorkTransferRequest.status == "Approved",
+            WorkTransferRequest.start_date <= today,
+            WorkTransferRequest.end_date >= today,
+            WorkTransferRequest.transfer_tasks == True
+        ).all()
+        delegator_ids = [r[0] for r in delegated_users]
+        
+        if delegator_ids:
+            query = Task.query.filter(
+                db.or_(
+                    Task.employee_id == current_user_id,
+                    Task.employee_id.in_(delegator_ids)
+                )
+            )
+        else:
+            query = Task.query.filter(Task.employee_id == current_user_id)
 
     if status := request.args.get("status"):
         if status not in VALID_STATUSES:
@@ -63,6 +84,45 @@ def list_tasks(current_user_id, current_user_role):
         "total": pagination.total,
         "page": page,
         "pages": pagination.pages,
+    }), 200
+
+# ------------------------------------------------------------------
+# GET /api/tasks/stats
+# ------------------------------------------------------------------
+@tasks_bp.route("/stats", methods=["GET"])
+@admin_required
+def get_task_stats(current_user_id, current_user_role):
+    """
+    Get aggregated task statistics for the dashboard.
+    Returns count distribution of tasks grouped by status for active employees only.
+    """
+    from sqlalchemy import func
+    from models import User
+    
+    # Query status distribution for tasks assigned to active employees
+    results = db.session.query(
+        Task.status,
+        func.count(Task.id)
+    ).join(
+        User, Task.employee_id == User.id
+    ).filter(
+        User.is_active == True
+    ).group_by(
+        Task.status
+    ).all()
+    
+    status_distribution = {
+        "Pending": 0,
+        "In Progress": 0,
+        "Completed": 0
+    }
+    
+    for status, count in results:
+        if status in status_distribution:
+            status_distribution[status] = count
+            
+    return jsonify({
+        "status_distribution": status_distribution
     }), 200
 
 
@@ -131,6 +191,20 @@ def create_task(current_user_id, current_user_role):
     except Exception:
         pass
 
+    # Create in-app Notification entry for tasks integration
+    from utils.notification_service import create_notification
+    try:
+        create_notification(
+            user_id=task.employee_id,
+            title="New Task Assigned",
+            content=f"You have been assigned a new task: {task.title}",
+            notification_type="Task",
+            target_id=task.id,
+            action_url="/tasks"
+        )
+    except Exception:
+        pass
+
     return jsonify(task.to_dict()), 201
 
 
@@ -147,9 +221,23 @@ def update_task(task_id, current_user_id, current_user_role):
     """
     task = Task.query.get_or_404(task_id)
 
-    # Employees can only update their own tasks' status
-    if current_user_role != "Admin" and task.employee_id != current_user_id:
-        return jsonify({"error": "Access denied. You can only update your own tasks."}), 403
+    # Employees can only update their own tasks' status or delegated tasks
+    is_authorized = (current_user_role == "Admin" or task.employee_id == current_user_id)
+    if not is_authorized:
+        from datetime import date
+        from models import WorkTransferRequest
+        today = date.today()
+        is_authorized = db.session.query(db.exists().where(db.and_(
+            WorkTransferRequest.requester_id == task.employee_id,
+            WorkTransferRequest.delegate_to_id == current_user_id,
+            WorkTransferRequest.status == "Approved",
+            WorkTransferRequest.start_date <= today,
+            WorkTransferRequest.end_date >= today,
+            WorkTransferRequest.transfer_tasks == True
+        ))).scalar()
+        
+    if not is_authorized:
+        return jsonify({"error": "Access denied. You can only update your own or delegated tasks."}), 403
 
     data = request.get_json(silent=True) or {}
 

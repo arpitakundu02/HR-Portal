@@ -11,7 +11,8 @@ import {
 import StatCard from '../components/common/StatCard';
 import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
-import { getEmployees, getLeaveRequests, getDepartments, actionLeaveRequest, getMeetings, getTasks, getAttendanceHistory } from '../services/api';
+import AnnouncementWidget from '../components/common/AnnouncementWidget';
+import { getEmployees, getLeaveRequests, actionLeaveRequest, getMeetings, getEmployeeStats, getTaskStats, getAttendanceStats, getLeaveStats } from '../services/api';
 import { useToast } from '../components/common/Toast';
 import { UsersIcon, ClockIcon, DocumentTextIcon, ClipboardCheckIcon, CalendarIcon, CheckIcon, CloseIcon, HourglassIcon, UserIcon } from '../components/common/Icons';
 
@@ -37,73 +38,61 @@ export default function AdminDashboard() {
   const loadDashboard = async () => {
     setLoading(true);
     try {
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      // eslint-disable-next-line no-unused-vars
-      const [empRes, leaveRes, deptRes, meetRes, taskRes, attRes] = await Promise.all([
-        getEmployees({ per_page: 100 }),
-        getLeaveRequests({ status: 'all' }),
-        getDepartments(),
+      const [
+        empStatsRes,
+        taskStatsRes,
+        attendanceStatsRes,
+        leaveStatsRes,
+        meetRes,
+        recentEmpRes,
+        pendingLeavesRes
+      ] = await Promise.all([
+        getEmployeeStats(),
+        getTaskStats(),
+        getAttendanceStats(),
+        getLeaveStats(),
         getMeetings({ upcoming: true }),
-        getTasks({ per_page: 100 }),
-        getAttendanceHistory({ month: currentMonth, per_page: 200 })
+        getEmployees({ per_page: 6 }),
+        getLeaveRequests({ status: 'Pending' })
       ]);
 
-      const employees   = empRes.data.employees || [];
-      const allLeaves   = leaveRes.data || [];
-      const meetings    = meetRes.data || [];
-      const tasks       = taskRes.data.tasks || [];
-      const attendance  = attRes.data.records || [];
-
-      // Calculate attendance today
-      const todayStr = new Date().toLocaleDateString('en-CA');
-      const todayRecords = attendance.filter((r) => r.date === todayStr);
-      const presentToday = todayRecords.filter((r) => r.check_in).length;
-
-      // Calculate completed tasks
-      const completedTasks = tasks.filter((t) => t.status === 'Completed').length;
+      const empStats = empStatsRes.data;
+      const taskStats = taskStatsRes.data;
+      const attendanceStats = attendanceStatsRes.data;
+      const leaveStats = leaveStatsRes.data;
+      const meetings = meetRes.data || [];
+      const recentEmployees = recentEmpRes.data.employees || [];
+      const pendingLeavesList = pendingLeavesRes.data || [];
 
       // KPI stats
       setStats({
-        employees: empRes.data.total || employees.length,
-        presentToday,
-        pendingLeaves: allLeaves.filter((l) => l.status === 'Pending').length,
-        completedTasks,
+        employees: empStats.active_employees,
+        presentToday: attendanceStats.present_today,
+        pendingLeaves: leaveStats.pending_leaves,
+        completedTasks: taskStats.status_distribution.Completed,
       });
 
       // Department distribution chart
-      const deptMap = {};
-      employees.forEach((e) => {
-        const name = e.department_name || 'Unassigned';
-        deptMap[name] = (deptMap[name] || 0) + 1;
-      });
-      setDeptData(Object.entries(deptMap).map(([name, count]) => ({ name, count })));
+      setDeptData(empStats.department_distribution);
 
       // Leave status pie
-      const lvPending  = allLeaves.filter((l) => l.status === 'Pending').length;
-      const lvApproved = allLeaves.filter((l) => l.status === 'Approved').length;
-      const lvRejected = allLeaves.filter((l) => l.status === 'Rejected').length;
       setLeaveData([
-        { name: 'Pending', value: lvPending, color: '#f59e0b' },
-        { name: 'Approved', value: lvApproved, color: '#10b981' },
-        { name: 'Rejected', value: lvRejected, color: '#f43f5e' },
+        { name: 'Pending', value: leaveStats.status_distribution.Pending, color: '#f59e0b' },
+        { name: 'Approved', value: leaveStats.status_distribution.Approved, color: '#10b981' },
+        { name: 'Rejected', value: leaveStats.status_distribution.Rejected, color: '#f43f5e' },
       ]);
 
       // Daily Attendance Donut Chart
-      const activeCount = empRes.data.total || employees.length;
-      const absentToday = Math.max(0, activeCount - presentToday);
       setAttendanceTodayData([
-        { name: 'Present', value: presentToday, color: '#10b981' },
-        { name: 'Absent', value: absentToday, color: '#f43f5e' }
+        { name: 'Present', value: attendanceStats.present_today, color: '#10b981' },
+        { name: 'Absent', value: attendanceStats.absent_today, color: '#f43f5e' }
       ]);
 
       // Task Progress Chart
-      const taskPending = tasks.filter((t) => t.status === 'Pending').length;
-      const taskInProg = tasks.filter((t) => t.status === 'In Progress').length;
-      const taskComp = tasks.filter((t) => t.status === 'Completed').length;
       setTaskData([
-        { name: 'Pending', value: taskPending, color: '#f59e0b' },
-        { name: 'In Progress', value: taskInProg, color: '#6366f1' },
-        { name: 'Completed', value: taskComp, color: '#10b981' }
+        { name: 'Pending', value: taskStats.status_distribution.Pending, color: '#f59e0b' },
+        { name: 'In Progress', value: taskStats.status_distribution["In Progress"], color: '#6366f1' },
+        { name: 'Completed', value: taskStats.status_distribution.Completed, color: '#10b981' }
       ]);
 
       // Meetings Density Chart (Next 7 Days)
@@ -111,23 +100,27 @@ export default function AdminDashboard() {
       for (let i = 0; i < 7; i++) {
         const d = new Date();
         d.setDate(d.getDate() + i);
-        const dateStr = d.toLocaleDateString('en-CA');
-        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        densityMap[dateStr] = { dateStr, label, count: 0 };
+        const dayStr = d.toISOString().split('T')[0];
+        densityMap[dayStr] = 0;
       }
       meetings.forEach((m) => {
-        const mDate = m.scheduled_at?.slice(0, 10);
-        if (densityMap[mDate]) {
-          densityMap[mDate].count += 1;
+        const dayStr = m.scheduled_at.split('T')[0];
+        if (dayStr in densityMap) {
+          densityMap[dayStr] += 1;
         }
       });
-      setMeetingsDensityData(Object.values(densityMap));
+      const densityList = Object.keys(densityMap).sort().map((dayStr) => {
+        const d = new Date(dayStr);
+        const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        return { label, count: densityMap[dayStr] };
+      });
+      setMeetingsDensityData(densityList);
 
-      // Pending leave requests table
-      setPendingLeaves(allLeaves.filter((l) => l.status === 'Pending').slice(0, 8));
+      // Pending leaves list
+      setPendingLeaves(pendingLeavesList.slice(0, 8));
 
       // Recent employees
-      setRecentEmps(employees.slice(0, 6));
+      setRecentEmps(recentEmployees);
     } catch (err) {
       toast.error('Failed to load dashboard data.');
     } finally {
@@ -150,13 +143,14 @@ export default function AdminDashboard() {
   return (
     <div className="fade-in">
       {/* KPI Cards */}
-      {/* KPI Cards */}
       <div className="stats-grid">
         <StatCard icon={<UsersIcon />} value={stats.employees}      label="Total Employees"      color="#6366f1" />
         <StatCard icon={<ClockIcon />} value={stats.presentToday}   label="Present Today"        color="#10b981" />
         <StatCard icon={<DocumentTextIcon />} value={stats.pendingLeaves}  label="Pending Leaves"       color="#f59e0b" />
         <StatCard icon={<ClipboardCheckIcon />} value={stats.completedTasks} label="Completed Tasks"      color="#a78bfa" />
       </div>
+
+      <AnnouncementWidget />
 
       {/* Row 1: Department Distribution and Leave Status */}
       <div className="grid-2" style={{ marginBottom: 24 }}>

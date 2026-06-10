@@ -20,6 +20,9 @@ import Tasks       from './pages/Tasks';
 import Meetings    from './pages/Meetings';
 import Profile     from './pages/Profile';
 import Settings    from './pages/Settings';
+import Holidays    from './pages/Holidays';
+import Announcements from './pages/Announcements';
+import WorkTransfers from './pages/WorkTransfers';
 
 export default function App() {
   return (
@@ -44,6 +47,9 @@ export default function App() {
                 <Route path="/meetings"    element={<Meetings />} />
                 <Route path="/profile"     element={<Profile />} />
                 <Route path="/settings"    element={<Settings />} />
+                <Route path="/holidays"    element={<Holidays />} />
+                <Route path="/announcements" element={<Announcements />} />
+                <Route path="/work-transfers" element={<WorkTransfers />} />
               </Route>
             </Route>
 

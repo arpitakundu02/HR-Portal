@@ -228,6 +228,11 @@ export default function Employees() {
                               }
                               label={emp.availability_status}
                             />
+                            {emp.upcoming_leave && (
+                              <div className="upcoming-leave-lbl" style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                Upcoming {emp.upcoming_leave.leave_type} in {emp.upcoming_leave.days_until_start} {emp.upcoming_leave.days_until_start === 1 ? 'day' : 'days'}
+                              </div>
+                            )}
                           </td>
                         </>
                       )}

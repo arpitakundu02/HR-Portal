@@ -21,6 +21,12 @@ from routes.attendance import attendance_bp
 from routes.meetings import meetings_bp
 from routes.tasks import tasks_bp
 from routes.exports import exports_bp
+from routes.holidays import holidays_bp
+from routes.approvals import approvals_bp
+from routes.profile import profile_bp
+from routes.notifications import notifications_bp
+from routes.announcements import announcements_bp
+from routes.work_transfers import work_transfers_bp
 
 
 def create_app(config_class=Config) -> Flask:
@@ -52,6 +58,12 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(meetings_bp,    url_prefix="/api/meetings")
     app.register_blueprint(tasks_bp,       url_prefix="/api/tasks")
     app.register_blueprint(exports_bp,     url_prefix="/api/exports")
+    app.register_blueprint(holidays_bp,    url_prefix="/api/holidays")
+    app.register_blueprint(approvals_bp,   url_prefix="/api/approvals")
+    app.register_blueprint(profile_bp,     url_prefix="/api/profile")
+    app.register_blueprint(notifications_bp, url_prefix="/api/notifications")
+    app.register_blueprint(announcements_bp, url_prefix="/api/announcements")
+    app.register_blueprint(work_transfers_bp, url_prefix="/api/work-transfers")
 
     # ------------------------------------------------------------------ #
     # Health check

@@ -168,6 +168,29 @@ def apply_leave(current_user_id, current_user_role):
     db.session.add(leave)
     db.session.commit()
 
+    # Trigger in-app notification to manager and delegate
+    from utils.notification_service import create_notification
+    try:
+        if employee.manager_id:
+            create_notification(
+                user_id=employee.manager_id,
+                title="Leave Approval Required",
+                content=f"{employee.name} has applied for leave from {data['start_date']} to {data['end_date']}.",
+                notification_type="Leave",
+                target_id=leave.id,
+                action_url="/leaves"
+            )
+        create_notification(
+            user_id=resp_transfer_id,
+            title="Responsibility Transfer Delegated",
+            content=f"{employee.name} has delegated responsibilities to you from {data['start_date']} to {data['end_date']}.",
+            notification_type="Leave",
+            target_id=leave.id,
+            action_url="/leaves"
+        )
+    except Exception:
+        pass
+
     # Send email notification to admin (non-blocking; errors logged but not raised)
     employee = User.query.get(current_user_id)
     try:
@@ -212,6 +235,45 @@ def leave_history(current_user_id, current_user_role):
     leaves = query.order_by(Leave.created_at.desc()).all()
     return jsonify([l.to_dict() for l in leaves]), 200
 
+# ------------------------------------------------------------------
+# GET /api/leaves/stats
+# ------------------------------------------------------------------
+@leaves_bp.route("/stats", methods=["GET"])
+@admin_required
+def get_leave_stats(current_user_id, current_user_role):
+    """
+    Get aggregated leave statistics.
+    Returns pending count and status distribution (active employees only by default).
+    """
+    from sqlalchemy import func
+    
+    include_inactive = request.args.get("include_inactive", "false").lower() == "true"
+    
+    query = db.session.query(
+        Leave.status,
+        func.count(Leave.id)
+    )
+    
+    if not include_inactive:
+        query = query.join(User, Leave.employee_id == User.id).filter(User.is_active == True)
+        
+    results = query.group_by(Leave.status).all()
+    
+    status_distribution = {
+        "Pending": 0,
+        "Approved": 0,
+        "Rejected": 0
+    }
+    
+    for status, count in results:
+        if status in status_distribution:
+            status_distribution[status] = count
+            
+    return jsonify({
+        "pending_leaves": status_distribution["Pending"],
+        "status_distribution": status_distribution
+    }), 200
+
 
 # ------------------------------------------------------------------
 # GET /api/leaves/requests  (Admin pending approvals)
@@ -246,6 +308,9 @@ def action_leave(leave_id, current_user_id, current_user_role):
         return jsonify({"error": "'status' must be 'Approved' or 'Rejected'."}), 422
 
     leave = Leave.query.get_or_404(leave_id)
+
+    if leave.employee_id == current_user_id:
+        return jsonify({"error": "Access denied. You cannot approve your own leave request."}), 403
 
     if leave.status != "Pending":
         return jsonify({"error": f"This request is already {leave.status}."}), 409

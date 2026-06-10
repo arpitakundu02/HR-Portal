@@ -264,3 +264,9 @@ export const HourglassIcon = ({ className = '', style = {} }) => (
   </svg>
 );
 
+export const MegaphoneIcon = ({ className = '', style = {} }) => (
+  <svg className={className} style={getBaseStyle(style)} {...baseSvgProps}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10.34 15.84c-.68-.68-1.5-1.2-2.4-1.54V10.7c.9-.34 1.72-.86 2.4-1.54L15 4v16l-4.66-4.16ZM3 9h3v6H3V9Zm15.5 3c0-1.8-1.04-3.36-2.5-4.12v8.24c1.46-.76 2.5-2.32 2.5-4.12ZM17 4.14v2.06c2.89.86 5 3.54 5 6.8s-2.11 5.94-5 6.8v2.06c4.01-.93 7-4.57 7-8.86s-2.99-7.93-7-8.86Z" />
+  </svg>
+);
+

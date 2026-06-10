@@ -20,6 +20,22 @@ from utils.email_service import send_meeting_notification
 meetings_bp = Blueprint("meetings", __name__)
 
 
+def _parse_and_convert_to_utc(dt_str: str):
+    import datetime as dt
+    # If the string ends with Z, replace it with +00:00 so fromisoformat can parse it on older python versions
+    if dt_str.endswith("Z"):
+        dt_str = dt_str[:-1] + "+00:00"
+    parsed_dt = dt.datetime.fromisoformat(dt_str)
+    if parsed_dt.tzinfo is None:
+        # Localize to Asia/Kolkata (+05:30) and convert to UTC
+        kolkata_tz = dt.timezone(dt.timedelta(hours=5, minutes=30))
+        parsed_dt = parsed_dt.replace(tzinfo=kolkata_tz)
+    utc_dt = parsed_dt.astimezone(dt.timezone.utc)
+    # Return timezone-naive UTC datetime to store in MySQL DATETIME
+    return utc_dt.replace(tzinfo=None)
+
+
+
 # ------------------------------------------------------------------
 # GET /api/meetings
 # ------------------------------------------------------------------
@@ -43,10 +59,31 @@ def list_meetings(current_user_id, current_user_role):
         user = User.query.get(current_user_id)
         dept_id = user.department_id if user else None
 
-        # Show company-wide (dept_id=NULL) and own department's meetings
-        query = Meeting.query.filter(
-            (Meeting.department_id == None) | (Meeting.department_id == dept_id)
-        )
+        # Check active delegations of meetings to current_user_id
+        from datetime import date
+        from models import WorkTransferRequest
+        today = date.today()
+        delegated_users = db.session.query(WorkTransferRequest.requester_id).filter(
+            WorkTransferRequest.delegate_to_id == current_user_id,
+            WorkTransferRequest.status == "Approved",
+            WorkTransferRequest.start_date <= today,
+            WorkTransferRequest.end_date >= today,
+            WorkTransferRequest.transfer_meetings == True
+        ).all()
+        delegator_ids = [r[0] for r in delegated_users]
+
+        # Get delegator departments
+        delegator_dept_ids = []
+        if delegator_ids:
+            delegator_dept_ids = [u.department_id for u in User.query.filter(User.id.in_(delegator_ids)).all() if u.department_id]
+
+        conditions = [Meeting.department_id == None]
+        if dept_id:
+            conditions.append(Meeting.department_id == dept_id)
+        for d_id in delegator_dept_ids:
+            conditions.append(Meeting.department_id == d_id)
+
+        query = Meeting.query.filter(db.or_(*conditions))
 
     if upcoming_only:
         query = query.filter(Meeting.scheduled_at >= datetime.utcnow())
@@ -82,7 +119,7 @@ def create_meeting(current_user_id, current_user_role):
         return jsonify({"error": "'title' and 'scheduled_at' are required."}), 422
 
     try:
-        scheduled_at = datetime.fromisoformat(data["scheduled_at"])
+        scheduled_at = _parse_and_convert_to_utc(data["scheduled_at"])
     except ValueError:
         return jsonify({"error": "'scheduled_at' must be ISO 8601 format (YYYY-MM-DDTHH:MM:SS)."}), 422
 
@@ -147,7 +184,7 @@ def update_meeting(meeting_id, current_user_id, current_user_role):
         meeting.department_id = data["department_id"]
     if "scheduled_at" in data:
         try:
-            meeting.scheduled_at = datetime.fromisoformat(data["scheduled_at"])
+            meeting.scheduled_at = _parse_and_convert_to_utc(data["scheduled_at"])
         except ValueError:
             return jsonify({"error": "'scheduled_at' must be ISO 8601 format."}), 422
     if "duration_minutes" in data:

@@ -18,17 +18,21 @@ class Department(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
-    employees = db.relationship("User", back_populates="department", lazy="dynamic")
+    employees = db.relationship("User", back_populates="department", lazy="dynamic", foreign_keys="User.department_id")
     meetings = db.relationship("Meeting", back_populates="department", lazy="dynamic")
+    manager = db.relationship("User", foreign_keys=[manager_id])
 
     def to_dict(self):
         return {
             "id": self.id,
             "name": self.name,
             "description": self.description,
+            "manager_id": self.manager_id,
+            "manager_name": self.manager.name if self.manager else None,
             "created_at": self.created_at.isoformat(),
         }
 
@@ -38,6 +42,9 @@ class Department(db.Model):
 # ============================================================
 class User(db.Model):
     __tablename__ = "users"
+    __table_args__ = (
+        db.Index("idx_users_active_dept", "is_active", "department_id"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.String(50), unique=True, nullable=False)  # e.g. HR-001
@@ -62,6 +69,7 @@ class User(db.Model):
     date_of_joining = db.Column(db.Date, nullable=True)
     salary = db.Column(db.Numeric(10, 2), nullable=True)
     rank = db.Column(db.String(50), nullable=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Documents
     aadhar_number = db.Column(db.String(20), nullable=True)
@@ -71,7 +79,8 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, default=True)
 
     # Relationships
-    department = db.relationship("Department", back_populates="employees")
+    department = db.relationship("Department", back_populates="employees", foreign_keys=[department_id])
+    manager = db.relationship("User", remote_side=[id], backref=db.backref("reports", lazy="dynamic"))
     leave_balances = db.relationship("LeaveBalance", back_populates="employee", lazy="dynamic", cascade="all, delete-orphan")
     leaves = db.relationship("Leave", foreign_keys="Leave.employee_id", back_populates="employee", lazy="dynamic", cascade="all, delete-orphan")
     attendance_records = db.relationship("Attendance", back_populates="employee", lazy="dynamic", cascade="all, delete-orphan")
@@ -95,6 +104,8 @@ class User(db.Model):
             "department_name": self.department.name if self.department else None,
             "date_of_joining": self.date_of_joining.isoformat() if self.date_of_joining else None,
             "rank": self.rank,
+            "manager_id": self.manager_id,
+            "manager_name": self.manager.name if self.manager else None,
             "resume_url": self.resume_url,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat(),
@@ -155,7 +166,7 @@ class Leave(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     reason = db.Column(db.Text, nullable=True)
-    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending")
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", index=True)
     actioned_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     actioned_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -208,6 +219,7 @@ class Attendance(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint("employee_id", "date", name="uq_employee_date"),
+        db.Index("idx_attendance_date_checkin", "date", "check_in"),
     )
 
     # Relationships
@@ -260,7 +272,7 @@ class Meeting(db.Model):
             "description": self.description,
             "department_id": self.department_id,
             "department_name": self.department.name if self.department else "Company-Wide",
-            "scheduled_at": self.scheduled_at.isoformat(),
+            "scheduled_at": self.scheduled_at.isoformat() + "Z",
             "duration_minutes": self.duration_minutes,
             "link": self.link,
             "created_by": self.created_by,
@@ -279,7 +291,7 @@ class Task(db.Model):
     title = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text, nullable=True)
     employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    status = db.Column(db.Enum("Pending", "In Progress", "Completed"), default="Pending")
+    status = db.Column(db.Enum("Pending", "In Progress", "Completed"), default="Pending", index=True)
     due_date = db.Column(db.Date, nullable=True)
     assigned_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -362,4 +374,243 @@ class AttendanceAdjustment(db.Model):
             "actioned_at": (self.actioned_at.isoformat() + "Z") if self.actioned_at else None,
         }
 
+# ============================================================
+# Holiday
+# ============================================================
+class Holiday(db.Model):
+    __tablename__ = "holidays"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    date = db.Column(db.Date, unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "date": self.date.isoformat(),
+            "description": self.description,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
+
+
+# ============================================================
+# Approval Request
+# ============================================================
+class ApprovalRequest(db.Model):
+    __tablename__ = "approval_requests"
+    __table_args__ = (
+        db.Index("idx_approvals_approver_status", "approver_id", "status"),
+        db.Index("idx_approvals_target", "module_type", "target_id"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    requester_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    approver_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    module_type = db.Column(db.String(50), nullable=False)
+    target_id = db.Column(db.Integer, nullable=False)
+    step_sequence = db.Column(db.Integer, default=1, nullable=False)
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", nullable=False)
+    comments = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    actioned_at = db.Column(db.DateTime, nullable=True)
+
+    # Relationships
+    requester = db.relationship("User", foreign_keys=[requester_id], backref=db.backref("requested_approvals", lazy="dynamic"))
+    approver = db.relationship("User", foreign_keys=[approver_id], backref=db.backref("assigned_approvals", lazy="dynamic"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "requester_id": self.requester_id,
+            "requester_name": self.requester.name if self.requester else None,
+            "approver_id": self.approver_id,
+            "approver_name": self.approver.name if self.approver else None,
+            "module_type": self.module_type,
+            "target_id": self.target_id,
+            "step_sequence": self.step_sequence,
+            "status": self.status,
+            "comments": self.comments,
+            "created_at": self.created_at.isoformat() + "Z",
+            "actioned_at": (self.actioned_at.isoformat() + "Z") if self.actioned_at else None,
+        }
+
+
+# ============================================================
+# Approval Log
+# ============================================================
+class ApprovalLog(db.Model):
+    __tablename__ = "approval_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    approval_request_id = db.Column(db.Integer, db.ForeignKey("approval_requests.id", ondelete="CASCADE"), nullable=False)
+    actioner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    old_status = db.Column(db.String(20), nullable=False)
+    new_status = db.Column(db.String(20), nullable=False)
+    comments = db.Column(db.Text, nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    request = db.relationship("ApprovalRequest", backref=db.backref("logs", lazy="dynamic", cascade="all, delete-orphan"))
+    actioner = db.relationship("User", foreign_keys=[actioner_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "approval_request_id": self.approval_request_id,
+            "actioner_id": self.actioner_id,
+            "actioner_name": self.actioner.name if self.actioner else None,
+            "old_status": self.old_status,
+            "new_status": self.new_status,
+            "comments": self.comments,
+            "timestamp": self.timestamp.isoformat() + "Z",
+        }
+
+
+# ============================================================
+# User Profile Update Request
+# ============================================================
+class UserProfileUpdate(db.Model):
+    __tablename__ = "user_profile_updates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    requested_changes = db.Column(db.JSON, nullable=False)
+    original_values = db.Column(db.JSON, nullable=False)
+    approval_request_id = db.Column(db.Integer, db.ForeignKey("approval_requests.id", ondelete="SET NULL"), nullable=True)
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = db.relationship("User", foreign_keys=[employee_id], backref=db.backref("profile_updates", lazy="dynamic", cascade="all, delete-orphan"))
+    approval_request = db.relationship("ApprovalRequest", foreign_keys=[approval_request_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "employee_name": self.employee.name if self.employee else None,
+            "requested_changes": self.requested_changes,
+            "original_values": self.original_values,
+            "approval_request_id": self.approval_request_id,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() + "Z",
+            "updated_at": self.updated_at.isoformat() + "Z",
+        }
+
+
+# ============================================================
+# Notification
+# ============================================================
+class Notification(db.Model):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        db.Index("idx_notifications_user_read", "user_id", "is_read"),
+        db.Index("idx_notifications_user_created", "user_id", "created_at"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    notification_type = db.Column(db.String(50), nullable=False)
+    target_id = db.Column(db.Integer, nullable=True)
+    action_url = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = db.relationship("User", foreign_keys=[user_id], backref=db.backref("notifications", lazy="dynamic", cascade="all, delete-orphan"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "title": self.title,
+            "content": self.content,
+            "is_read": self.is_read,
+            "notification_type": self.notification_type,
+            "target_id": self.target_id,
+            "action_url": self.action_url,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
+
+
+# ============================================================
+# Announcement
+# ============================================================
+class Announcement(db.Model):
+    __tablename__ = "announcements"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    audience_type = db.Column(db.Enum("All", "Department", "Employees", "Managers"), default="All", nullable=False)
+    department_id = db.Column(db.Integer, db.ForeignKey("departments.id", ondelete="CASCADE"), nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    # Relationships
+    creator = db.relationship("User", foreign_keys=[created_by])
+    department = db.relationship("Department", foreign_keys=[department_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "content": self.content,
+            "audience_type": self.audience_type,
+            "department_id": self.department_id,
+            "department_name": self.department.name if self.department else None,
+            "created_by": self.created_by,
+            "creator_name": self.creator.name if self.creator else None,
+            "created_at": self.created_at.isoformat() + "Z",
+            "expires_at": self.expires_at.isoformat() + "Z" if self.expires_at else None,
+            "is_active": self.is_active,
+        }
+
+
+# ============================================================
+# Work Transfer Request / Delegation
+# ============================================================
+class WorkTransferRequest(db.Model):
+    __tablename__ = "work_transfer_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    requester_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    delegate_to_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    transfer_tasks = db.Column(db.Boolean, default=False, nullable=False)
+    transfer_approvals = db.Column(db.Boolean, default=False, nullable=False)
+    transfer_meetings = db.Column(db.Boolean, default=False, nullable=False)
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", nullable=False)
+    approval_request_id = db.Column(db.Integer, db.ForeignKey("approval_requests.id", ondelete="SET NULL"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    requester = db.relationship("User", foreign_keys=[requester_id], backref=db.backref("sent_transfers", lazy="dynamic"))
+    delegate = db.relationship("User", foreign_keys=[delegate_to_id], backref=db.backref("received_transfers", lazy="dynamic"))
+    approval_request = db.relationship("ApprovalRequest", foreign_keys=[approval_request_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "requester_id": self.requester_id,
+            "requester_name": self.requester.name if self.requester else None,
+            "delegate_to_id": self.delegate_to_id,
+            "delegate_name": self.delegate.name if self.delegate else None,
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "transfer_tasks": self.transfer_tasks,
+            "transfer_approvals": self.transfer_approvals,
+            "transfer_meetings": self.transfer_meetings,
+            "status": self.status,
+            "approval_request_id": self.approval_request_id,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
 
