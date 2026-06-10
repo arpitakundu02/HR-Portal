@@ -4,6 +4,7 @@
  * Receives initialData (null = add mode), departments list, onSubmit, onCancel.
  */
 import { useState, useEffect } from 'react';
+import { EyeIcon, EyeOffIcon } from '../common/Icons';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -17,6 +18,7 @@ const EMPTY = {
 export default function EmployeeForm({ initialData, departments, onSubmit, onCancel, loading }) {
   const isEdit = !!initialData;
   const [form, setForm] = useState(EMPTY);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -83,8 +85,18 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
         </div>
         <div className="form-group">
           <label className="form-label">{isEdit ? 'New Password (leave blank to keep)' : 'Password *'}</label>
-          <input className="form-control" type="password" name="password" value={form.password}
-            onChange={change} required={!isEdit} placeholder={isEdit ? 'Leave blank to keep current' : 'Min 6 characters'} />
+          <div className="password-input-wrapper">
+            <input className="form-control" type={showPassword ? "text" : "password"} name="password" value={form.password}
+              onChange={change} required={!isEdit} placeholder={isEdit ? 'Leave blank to keep current' : 'Min 6 characters'} />
+            <button
+              type="button"
+              className="password-toggle-btn"
+              onClick={() => setShowPassword(p => !p)}
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
         </div>
       </div>
 

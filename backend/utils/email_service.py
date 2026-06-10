@@ -62,10 +62,15 @@ def _build_message(to_email: str, subject: str, html_body: str) -> MIMEMultipart
 
 def send_email(subject: str, body: str, recipient: str) -> bool:
     """
-    Send an HTML email via SMTP.
+    Send an HTML email via SMTP with structured logging and retry logic.
     In development, if SMTP_USER is not configured, logs the email content instead (dev mode).
     This function blocks; use send_email_async for non-blocking.
     """
+    import time
+    from datetime import datetime
+
+    timestamp = datetime.utcnow().isoformat() + " UTC"
+    
     # Fallback to check app context config if not running in thread
     smtp_user = current_app.config.get("SMTP_USER", "")
     smtp_password = current_app.config.get("SMTP_PASSWORD", "")
@@ -82,25 +87,55 @@ def send_email(subject: str, body: str, recipient: str) -> bool:
 
     if not smtp_user:
         logger.info(
-            "[EMAIL - DEV/CONSOLE MODE] To: %s | Subject: %s\n%s",
-            recipient, subject, html_body
+            "[EMAIL - DEV/CONSOLE MODE] [SUCCESS] [Timestamp: %s] To: %s | Subject: %s\n%s",
+            timestamp, recipient, subject, html_body
         )
         # Also print to stdout for simple logs verification
-        print(f"\n[STDOUT EMAIL] To: {recipient} | Subject: {subject}\n{body}\n")
+        print(f"\n[STDOUT EMAIL] [SUCCESS] [Timestamp: {timestamp}] To: {recipient} | Subject: {subject}\n{body}\n")
         return True
 
-    try:
-        msg = _build_message(recipient, subject, html_body)
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_from, recipient, msg.as_string())
-        logger.info("Email sent successfully to %s", recipient)
-        return True
-    except Exception as exc:
-        logger.error("Failed to send email to %s: %s", recipient, exc)
-        return False
+    msg = _build_message(recipient, subject, html_body)
+    max_retries = 3
+    retry_delay = 2  # initial backoff in seconds
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(
+                "[EMAIL - SEND ATTEMPT %d/%d] [Timestamp: %s] To: %s | Subject: %s",
+                attempt, max_retries, datetime.utcnow().isoformat() + " UTC", recipient, subject
+            )
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_from, recipient, msg.as_string())
+            
+            logger.info(
+                "[EMAIL - SEND SUCCESS] [Timestamp: %s] To: %s | Subject: %s",
+                datetime.utcnow().isoformat() + " UTC", recipient, subject
+            )
+            return True
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, smtplib.SMTPResponseException, OSError) as exc:
+            logger.warning(
+                "[EMAIL - RETRIABLE FAILURE] [Attempt %d/%d] [Timestamp: %s] To: %s | Error: %s",
+                attempt, max_retries, datetime.utcnow().isoformat() + " UTC", recipient, str(exc)
+            )
+            if attempt < max_retries:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.error(
+                    "[EMAIL - SEND FAILURE] [Final Attempt] [Timestamp: %s] To: %s | Subject: %s | Error: %s",
+                    datetime.utcnow().isoformat() + " UTC", recipient, subject, str(exc)
+                )
+        except Exception as exc:
+            logger.error(
+                "[EMAIL - SEND FAILURE] [Non-retriable Error] [Timestamp: %s] To: %s | Subject: %s | Error: %s",
+                datetime.utcnow().isoformat() + " UTC", recipient, subject, str(exc)
+            )
+            return False
+
+    return False
 
 
 def send_email_async(subject: str, body: str, recipient: str):
@@ -313,3 +348,43 @@ def send_resume_confirmation(employee_name: str, employee_id: str, upload_timest
     body = HTML_TEMPLATE_WRAPPER.format(content=content)
     send_email_async(subject, body, recipient)
     return True
+
+
+def send_regularization_notification(employee_name: str, employee_id: str, date_str: str,
+                                     check_in_str: str, check_out_str: str, reason: str,
+                                     recipient: str, status: str = None, comment: str = None) -> bool:
+    """Send attendance regularization submission (to Admin) or action update (to Employee) notifications."""
+    if status is None:
+        # Submission alert to Admin
+        subject = "New Attendance Regularization Request"
+        content = f"""
+        <h3 style="color: #4f46e5; margin-top: 0;">Attendance Regularization Submitted</h3>
+        <p>A new attendance regularization request requires your administrative attention.</p>
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+        <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Employee Name:</td><td style="padding: 6px 0; font-weight: 600;">{employee_name}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Employee ID:</td><td style="padding: 6px 0;">{employee_id}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Date:</td><td style="padding: 6px 0;">{date_str}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Requested Check-In:</td><td style="padding: 6px 0;">{check_in_str or "—"}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Requested Check-Out:</td><td style="padding: 6px 0;">{check_out_str or "—"}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Reason:</td><td style="padding: 6px 0; color: #4b5563;">{reason}</td></tr>
+        </table>
+        """
+    else:
+        # Action update to Employee
+        subject = f"Attendance Regularization Request {status}"
+        color = "#10b981" if status == "Approved" else "#ef4444"
+        content = f"""
+        <h3 style="color: {color}; margin-top: 0;">Regularization Request {status}</h3>
+        <p>Your attendance regularization request status has been updated by the Admin.</p>
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+        <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Date:</td><td style="padding: 6px 0; font-weight: 600;">{date_str}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Status:</td><td style="padding: 6px 0; color: {color}; font-weight: 700;">{status}</td></tr>
+          {f"<tr><td style='padding: 6px 0; color: #6b7280; font-weight: 600;'>Admin Comment:</td><td style='padding: 6px 0; color: #4b5563;'>{comment}</td></tr>" if comment else ""}
+        </table>
+        """
+    body = HTML_TEMPLATE_WRAPPER.format(content=content)
+    send_email_async(subject, body, recipient)
+    return True
+

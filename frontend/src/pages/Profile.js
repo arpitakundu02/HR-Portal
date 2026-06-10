@@ -9,7 +9,7 @@ import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
 import { useToast } from '../components/common/Toast';
 import { getMe, updateEmployee, uploadResume } from '../services/api';
-import { EditIcon, DownloadIcon, UploadIcon, SaveIcon, LockIcon } from '../components/common/Icons';
+import { EditIcon, DownloadIcon, UploadIcon, SaveIcon, LockIcon, EyeIcon, EyeOffIcon } from '../components/common/Icons';
 
 export default function Profile() {
   const { user, updateUser, isAdmin } = useAuth();
@@ -51,6 +51,8 @@ export default function Profile() {
   const [pwForm,    setPwForm]    = useState({ password: '', confirm: '' });
   const [pwSaving,  setPwSaving]  = useState(false);
   const [pwVisible, setPwVisible] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -245,14 +247,34 @@ export default function Profile() {
             <form onSubmit={handlePasswordChange}>
               <div className="form-group">
                 <label className="form-label">New Password <span className="form-required">*</span></label>
-                <input className="form-control" type="password" value={pwForm.password} required
-                  onChange={(e) => setPwForm((f) => ({ ...f, password: e.target.value }))}
-                  placeholder="Minimum 6 characters" />
+                <div className="password-input-wrapper">
+                  <input className="form-control" type={showNewPassword ? "text" : "password"} value={pwForm.password} required
+                    onChange={(e) => setPwForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder="Minimum 6 characters" />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowNewPassword(p => !p)}
+                    title={showNewPassword ? "Hide password" : "Show password"}
+                  >
+                    {showNewPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Confirm Password <span className="form-required">*</span></label>
-                <input className="form-control" type="password" value={pwForm.confirm} required
-                  onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))} />
+                <div className="password-input-wrapper">
+                  <input className="form-control" type={showConfirmPassword ? "text" : "password"} value={pwForm.confirm} required
+                    onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))} />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowConfirmPassword(p => !p)}
+                    title={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPwVisible(false)}>Cancel</button>

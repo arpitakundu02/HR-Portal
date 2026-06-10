@@ -160,8 +160,11 @@ class Leave(db.Model):
     actioned_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    responsibility_transfer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
     # Relationships
     employee = db.relationship("User", foreign_keys=[employee_id], back_populates="leaves")
+    responsibility_transfer = db.relationship("User", foreign_keys=[responsibility_transfer_id])
     actioned_by_user = db.relationship("User", foreign_keys=[actioned_by])
 
     @property
@@ -180,6 +183,8 @@ class Leave(db.Model):
             "days_requested": self.days_requested,
             "reason": self.reason,
             "status": self.status,
+            "responsibility_transfer_id": self.responsibility_transfer_id,
+            "responsibility_transfer_name": self.responsibility_transfer.name if self.responsibility_transfer else None,
             "actioned_by": self.actioned_by,
             "actioned_at": (self.actioned_at.isoformat() + "Z") if self.actioned_at else None,
             "created_at": self.created_at.isoformat() + "Z",
@@ -312,4 +317,49 @@ class SystemSetting(db.Model):
             "key": self.key,
             "value": self.value,
         }
+
+
+# ============================================================
+# Attendance Adjustment / Regularization
+# ============================================================
+class AttendanceAdjustment(db.Model):
+    __tablename__ = "attendance_adjustments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    check_in = db.Column(db.DateTime, nullable=True)
+    check_out = db.Column(db.DateTime, nullable=True)
+    original_check_in = db.Column(db.DateTime, nullable=True)
+    original_check_out = db.Column(db.DateTime, nullable=True)
+    reason = db.Column(db.Text, nullable=False)
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", nullable=False)
+    approval_comment = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    actioned_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    actioned_at = db.Column(db.DateTime, nullable=True)
+
+    # Relationships
+    employee = db.relationship("User", foreign_keys=[employee_id], backref=db.backref("adjustments", lazy="dynamic", cascade="all, delete-orphan"))
+    actioned_by_user = db.relationship("User", foreign_keys=[actioned_by])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "employee_name": self.employee.name if self.employee else None,
+            "date": self.date.isoformat(),
+            "check_in": (self.check_in.isoformat() + "Z") if self.check_in else None,
+            "check_out": (self.check_out.isoformat() + "Z") if self.check_out else None,
+            "original_check_in": (self.original_check_in.isoformat() + "Z") if self.original_check_in else None,
+            "original_check_out": (self.original_check_out.isoformat() + "Z") if self.original_check_out else None,
+            "reason": self.reason,
+            "status": self.status,
+            "approval_comment": self.approval_comment,
+            "created_at": self.created_at.isoformat() + "Z",
+            "actioned_by": self.actioned_by,
+            "actioned_by_name": self.actioned_by_user.name if self.actioned_by_user else None,
+            "actioned_at": (self.actioned_at.isoformat() + "Z") if self.actioned_at else None,
+        }
+
 

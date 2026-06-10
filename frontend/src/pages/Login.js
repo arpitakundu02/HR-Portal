@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { loginUser } from '../services/api';
 import { useToast } from '../components/common/Toast';
+import { EyeIcon, EyeOffIcon, BuildingIcon, SunIcon, MoonIcon, SparklesIcon, UsersIcon, ClockIcon, CalendarIcon, ChartBarIcon, ShieldCheckIcon, UserIcon } from '../components/common/Icons';
 
 export default function Login() {
   const { isAuthenticated, login } = useAuth();
@@ -25,6 +26,7 @@ export default function Login() {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Clear error when portal is changed
   useEffect(() => {
@@ -77,7 +79,9 @@ export default function Login() {
         {/* Top Header Logo */}
         <div className="landing-top-bar">
           <div className="landing-logo">
-            <div className="landing-logo-icon">🏛️</div>
+            <div className="landing-logo-icon">
+              <BuildingIcon style={{ width: 24, height: 24 }} />
+            </div>
             <span className="landing-logo-text">HR Portal</span>
           </div>
           <button 
@@ -85,14 +89,17 @@ export default function Login() {
             className="theme-switch-btn" 
             onClick={toggleTheme}
             title={`Toggle ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {theme === 'dark' ? <SunIcon style={{ width: 16, height: 16 }} /> : <MoonIcon style={{ width: 16, height: 16 }} />}
           </button>
         </div>
 
         {/* Hero Copy */}
         <div className="landing-hero">
-          <div className="landing-badge">✨ Next-Generation HR Solutions</div>
+          <div className="landing-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <SparklesIcon style={{ width: 14, height: 14 }} /> Next-Generation HR Solutions
+          </div>
           <h2>Smart <span>HR Management</span> System</h2>
           <p>
             An integrated SaaS system designed to manage employees, tracking, leaves, meetings, and team workflows efficiently. Experiencing a smooth, premium employee management ecosystem.
@@ -124,28 +131,36 @@ export default function Login() {
         {/* Live Metrics Widget */}
         <div className="landing-stats-grid">
           <div className="landing-stat-card">
-            <div className="landing-stat-icon">👥</div>
+            <div className="landing-stat-icon">
+              <UsersIcon style={{ width: 18, height: 18 }} />
+            </div>
             <div className="landing-stat-info">
               <h4>120+</h4>
               <p>Employees Managed</p>
             </div>
           </div>
           <div className="landing-stat-card">
-            <div className="landing-stat-icon">⏱️</div>
+            <div className="landing-stat-icon">
+              <ClockIcon style={{ width: 18, height: 18 }} />
+            </div>
             <div className="landing-stat-info">
               <h4>98.5%</h4>
               <p>Attendance Tracking</p>
             </div>
           </div>
           <div className="landing-stat-card">
-            <div className="landing-stat-icon">📅</div>
+            <div className="landing-stat-icon">
+              <CalendarIcon style={{ width: 18, height: 18 }} />
+            </div>
             <div className="landing-stat-info">
               <h4>24h</h4>
               <p>Leave Requests SLA</p>
             </div>
           </div>
           <div className="landing-stat-card">
-            <div className="landing-stat-icon">📈</div>
+            <div className="landing-stat-icon">
+              <ChartBarIcon style={{ width: 18, height: 18 }} />
+            </div>
             <div className="landing-stat-info">
               <h4>A+</h4>
               <p>Performance Reviews</p>
@@ -180,7 +195,9 @@ export default function Login() {
                 className={`role-card ${selectedRole === 'Admin' ? 'admin-selected' : ''}`}
                 onClick={() => setSelectedRole('Admin')}
               >
-                <div className="role-card-icon">💼</div>
+                <div className="role-card-icon">
+                  <ShieldCheckIcon style={{ width: 24, height: 24 }} />
+                </div>
                 <h3>Admin Portal</h3>
                 <p>Company settings & management</p>
               </div>
@@ -190,11 +207,14 @@ export default function Login() {
                 className={`role-card ${selectedRole === 'Employee' ? 'employee-selected' : ''}`}
                 onClick={() => setSelectedRole('Employee')}
               >
-                <div className="role-card-icon">👤</div>
+                <div className="role-card-icon">
+                  <UserIcon style={{ width: 24, height: 24 }} />
+                </div>
                 <h3>Employee Portal</h3>
                 <p>Personal profile & logs</p>
               </div>
             </div>
+
 
             <button
               type="button"
@@ -248,16 +268,26 @@ export default function Login() {
 
               <div className="form-group">
                 <label className="form-label">Password</label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  className="form-control"
-                  required
-                  placeholder="••••••••"
-                  value={loginForm.password}
-                  onChange={handleLoginChange}
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    className="form-control"
+                    required
+                    placeholder="••••••••"
+                    value={loginForm.password}
+                    onChange={handleLoginChange}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowPassword(p => !p)}
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
               </div>
 
               <button

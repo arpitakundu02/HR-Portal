@@ -3,16 +3,14 @@
  * Employee overview: leave balances, today's attendance, tasks, upcoming meetings.
  */
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
 import StatCard from '../components/common/StatCard';
 import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
 import { getLeaveBalances, getTodayStatus, getTasks, getMeetings } from '../services/api';
 import { useToast } from '../components/common/Toast';
-import { DocumentTextIcon, HomeIcon, ClipboardCheckIcon, UserGroupIcon, InboxIcon } from '../components/common/Icons';
+import { DocumentTextIcon, HomeIcon, ClipboardCheckIcon, UserGroupIcon, InboxIcon, ClockIcon, CalendarIcon, CheckIcon, UsersIcon } from '../components/common/Icons';
 
 export default function EmployeeDashboard() {
-  const { user } = useAuth();
   const toast    = useToast();
 
   const [balances,   setBalances]   = useState([]);
@@ -48,24 +46,8 @@ export default function EmployeeDashboard() {
   const aplBalance = balances.find((b) => b.leave_type === 'APL');
   const wfhBalance = balances.find((b) => b.leave_type === 'WFH');
 
-  const greeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
-
   return (
     <div className="fade-in">
-      {/* Greeting */}
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)' }}>
-          {greeting()}, {user?.name?.split(' ')[0]} 👋
-        </h2>
-        <p style={{ color: 'var(--text-muted)', marginTop: 4 }}>
-          Here's what's happening with your account today.
-        </p>
-      </div>
 
       {/* Leave Balance Cards */}
       <div className="stats-grid">
@@ -79,7 +61,9 @@ export default function EmployeeDashboard() {
         {/* Today's Attendance */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">⏱️ Today's Attendance</div>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ClockIcon style={{ width: 16, height: 16 }} /> Today's Attendance
+            </div>
           </div>
           {attendance && attendance.status !== 'not_checked_in' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -106,7 +90,9 @@ export default function EmployeeDashboard() {
             </div>
           ) : (
             <div className="empty-state" style={{ padding: '30px 20px' }}>
-              <div className="empty-state-icon">⏰</div>
+              <div className="empty-state-icon">
+                <ClockIcon style={{ width: 48, height: 48 }} />
+              </div>
               <h3>Not checked in yet</h3>
               <p>Go to Attendance to check in for today.</p>
             </div>
@@ -116,7 +102,9 @@ export default function EmployeeDashboard() {
         {/* Leave Balance Detail */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">📅 Leave Balance</div>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CalendarIcon style={{ width: 16, height: 16 }} /> Leave Balance
+            </div>
           </div>
           {balances.map((b) => (
             <div key={b.leave_type} style={{
@@ -143,11 +131,15 @@ export default function EmployeeDashboard() {
       {/* My Pending Tasks */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
-          <div className="card-title">✅ My Pending Tasks</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ClipboardCheckIcon style={{ width: 16, height: 16 }} /> My Pending Tasks
+          </div>
         </div>
         {tasks.length === 0 ? (
           <div className="empty-state" style={{ padding: 30 }}>
-            <div className="empty-state-icon">🎉</div>
+            <div className="empty-state-icon">
+              <CheckIcon style={{ width: 48, height: 48, color: 'var(--success)' }} />
+            </div>
             <h3>No pending tasks!</h3>
           </div>
         ) : (
@@ -174,7 +166,9 @@ export default function EmployeeDashboard() {
       {/* Upcoming Meetings */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">🤝 Upcoming Meetings</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <UsersIcon style={{ width: 16, height: 16 }} /> Upcoming Meetings
+          </div>
         </div>
         {meetings.length === 0 ? (
           <div className="empty-state" style={{ padding: 30 }}>
@@ -190,8 +184,10 @@ export default function EmployeeDashboard() {
               <div style={{
                 width: 44, height: 44, borderRadius: 10,
                 background: 'var(--accent-glow)', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: 20, flexShrink: 0,
-              }}>🤝</div>
+                justifyContent: 'center', flexShrink: 0,
+              }}>
+                <UsersIcon style={{ width: 20, height: 20, color: 'var(--accent-light)' }} />
+              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.title}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>

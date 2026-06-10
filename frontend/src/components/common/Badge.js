@@ -14,9 +14,10 @@ const STATUS_CLASS = {
   'Inactive':    'badge-inactive',
   'APL':         'badge-apl',
   'WFH':         'badge-wfh',
+  'Leave':       'badge-rejected',
 };
 
-export default function Badge({ status }) {
+export default function Badge({ status, label }) {
   const cls = STATUS_CLASS[status] || 'badge-pending';
-  return <span className={`badge ${cls}`}>{status}</span>;
+  return <span className={`badge ${cls}`}>{label || status}</span>;
 }

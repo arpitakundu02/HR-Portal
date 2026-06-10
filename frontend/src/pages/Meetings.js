@@ -10,7 +10,7 @@ import Spinner from '../components/common/Spinner';
 import MeetingForm from '../components/forms/MeetingForm';
 import { useToast } from '../components/common/Toast';
 import { getMeetings, createMeeting, updateMeeting, deleteMeeting, getDepartments } from '../services/api';
-import { EditIcon, TrashIcon, PlusIcon, InboxIcon } from '../components/common/Icons';
+import { EditIcon, TrashIcon, PlusIcon, InboxIcon, CalendarIcon, ClockIcon, UsersIcon, LinkIcon, UserIcon } from '../components/common/Icons';
 
 export default function Meetings() {
   const { isAdmin } = useAuth();
@@ -84,9 +84,9 @@ export default function Meetings() {
       </div>
 
       <div className="tabs">
-        {[{ key: 'upcoming', label: '📅 Upcoming' }, { key: 'past', label: '🕐 Past' }].map((t) => (
-          <button key={t.key} className={`tab-btn ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>
-            {t.label}
+        {[{ key: 'upcoming', label: 'Upcoming', icon: <CalendarIcon style={{ marginRight: 6 }} /> }, { key: 'past', label: 'Past', icon: <ClockIcon style={{ marginRight: 6 }} /> }].map((t) => (
+          <button key={t.key} className={`tab-btn ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            {t.icon}{t.label}
           </button>
         ))}
       </div>
@@ -122,8 +122,10 @@ export default function Meetings() {
                         background: isDept ? 'rgba(59, 130, 246, 0.12)' : 'rgba(139, 92, 246, 0.12)',
                         color: isDept ? '#3b82f6' : '#8b5cf6',
                         display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontSize: 24,
-                      }}>🤝</div>
+                        justifyContent: 'center',
+                      }}>
+                        <UsersIcon style={{ width: 24, height: 24 }} />
+                      </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
                           <h3 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center' }}>
@@ -140,15 +142,17 @@ export default function Meetings() {
                         </div>
                         {m.description && <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 10, lineHeight: 1.5 }}>{m.description}</p>}
                         <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>📅 {formatDate(m.scheduled_at)}</span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>⏱ {m.duration_minutes} min</span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>👤 {m.creator_name}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><CalendarIcon style={{ width: 14, height: 14 }} /> {formatDate(m.scheduled_at)}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><ClockIcon style={{ width: 14, height: 14 }} /> {m.duration_minutes} min</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><UserIcon style={{ width: 14, height: 14 }} /> {m.creator_name}</span>
                         </div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
                       {m.link && (
-                        <a href={m.link} target="_blank" rel="noreferrer" className="btn btn-success btn-sm" style={{ padding: '8px 16px', borderRadius: 8 }}>🔗 Join</a>
+                        <a href={m.link} target="_blank" rel="noreferrer" className="btn btn-success btn-sm" style={{ padding: '8px 16px', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <LinkIcon style={{ width: 14, height: 14 }} /> Join
+                        </a>
                       )}
                       {isAdmin && (
                         <>

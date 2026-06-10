@@ -226,3 +226,41 @@ export const DocumentIcon = ({ className = '', style = {} }) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
   </svg>
 );
+
+export const EyeIcon = ({ className = '', style = {} }) => (
+  <svg className={className} style={getBaseStyle(style)} {...baseSvgProps}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+  </svg>
+);
+
+export const EyeOffIcon = ({ className = '', style = {} }) => (
+  <svg className={className} style={getBaseStyle(style)} {...baseSvgProps}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12c.045.16.1.315.163.469C3.51 16.64 7.42 19.5 12 19.5c1.868 0 3.61-.472 5.143-1.303M17.657 17.657l-1.386-1.386M20.02 11.777c.045-.16.096-.32.152-.477C18.79 7.14 14.88 4.5 10 4.5c-1.442 0-2.812.272-4.07.767M10.88 10.88l-1.386-1.386m0 0L4.5 4.5m4.994 4.994l5.012 5.012M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+  </svg>
+);
+
+export const SunIcon = ({ className = '', style = {} }) => (
+  <svg className={className} style={getBaseStyle(style)} {...baseSvgProps}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1.5M12 19.5V21M4.22 4.22l1.06 1.06M17.72 17.72l1.06 1.06M3 12h1.5M19.5 12H21M4.22 19.78l1.06-1.06M17.72 6.28l1.06-1.06M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z" />
+  </svg>
+);
+
+export const MoonIcon = ({ className = '', style = {} }) => (
+  <svg className={className} style={getBaseStyle(style)} {...baseSvgProps}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+  </svg>
+);
+
+export const SparklesIcon = ({ className = '', style = {} }) => (
+  <svg className={className} style={getBaseStyle(style)} {...baseSvgProps}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 21l-.813-5.096L3.096 15 8 14.187 8.813 9l.813 5.187L15 15l-5.187.904ZM18 10.5l-.36-.9L16.5 9.24l.9-.36.36-.9.36.9.9.36-.9.36-.36.9ZM19 4.5l-.2-.5-.5-.2.5-.2.2-.5.2.5.5.2-.5.2-.2.5Z" />
+  </svg>
+);
+
+export const HourglassIcon = ({ className = '', style = {} }) => (
+  <svg className={className} style={getBaseStyle(style)} {...baseSvgProps}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+);
+

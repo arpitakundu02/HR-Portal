@@ -17,7 +17,7 @@ IMPORTANT: Set DB_PASSWORD in your .env file before running.
 import bcrypt
 from app import create_app
 from extensions import db
-from models import Department, User, LeaveBalance, SystemSetting
+from models import Department, User, LeaveBalance, SystemSetting, AttendanceAdjustment
 
 # Default departments defined in the requirements
 DEFAULT_DEPARTMENTS = [

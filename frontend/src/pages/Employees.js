@@ -116,8 +116,8 @@ export default function Employees() {
     <div className="fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h2>Employee Directory</h2>
-          <p>{total} employee{total !== 1 ? 's' : ''} found</p>
+          <h2>{isAdmin ? 'Employee Directory' : 'Team Directory'}</h2>
+          <p>{total} {isAdmin ? 'employee' : 'team member'}{total !== 1 ? 's' : ''} found</p>
         </div>
         {isAdmin && (
           <div className="page-header-actions">
@@ -134,19 +134,21 @@ export default function Employees() {
           <span className="search-icon">🔍</span>
           <input
             className="form-control"
-            placeholder="Search by name, ID or email…"
+            placeholder={isAdmin ? "Search by name, ID or email…" : "Search by name or email…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select
-          className="form-control filter-select"
-          value={deptFilter}
-          onChange={(e) => { setDeptFilter(e.target.value); setPage(1); }}
-        >
-          <option value="">All Departments</option>
-          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+        {isAdmin && (
+          <select
+            className="form-control filter-select"
+            value={deptFilter}
+            onChange={(e) => { setDeptFilter(e.target.value); setPage(1); }}
+          >
+            <option value="">All Departments</option>
+            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        )}
       </div>
 
       {/* Table */}
@@ -156,42 +158,78 @@ export default function Employees() {
             <div className="table-wrapper">
               <table>
                 <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Department</th>
-                    <th>Rank</th>
-                    <th>Role</th>
-                    <th>Joined</th>
-                    <th>Status</th>
-                    {isAdmin && <th>Actions</th>}
-                  </tr>
+                  {isAdmin ? (
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Department</th>
+                      <th>Rank</th>
+                      <th>Role</th>
+                      <th>Joined</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <th>Name</th>
+                      <th>Designation / Role</th>
+                      <th>Department</th>
+                      <th>Contact Information</th>
+                      <th>Availability Status</th>
+                    </tr>
+                  )}
                 </thead>
                 <tbody>
                   {employees.length === 0 && (
-                    <tr><td colSpan={isAdmin ? 9 : 8}>
-                      <div className="empty-state"><div className="empty-state-icon"><UsersIcon style={{ width: 48, height: 48 }} /></div><h3>No employees found</h3></div>
-                    </td></tr>
+                    <tr>
+                      <td colSpan={isAdmin ? 9 : 5}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon">
+                            <UsersIcon style={{ width: 48, height: 48 }} />
+                          </div>
+                          <h3>No employees found</h3>
+                        </div>
+                      </td>
+                    </tr>
                   )}
                   {employees.map((emp) => (
                     <tr key={emp.id}>
-                      <td className="td-muted">{emp.employee_id}</td>
-                      <td style={{ fontWeight: 600 }}>{emp.name}</td>
-                      <td className="td-muted">{emp.email}</td>
-                      <td className="td-muted">{emp.department_name || '—'}</td>
-                      <td className="td-muted">{emp.rank || '—'}</td>
-                      <td><Badge status={emp.role} /></td>
-                      <td className="td-muted">{emp.date_of_joining || '—'}</td>
-                      <td><Badge status={emp.is_active ? 'Active' : 'Inactive'} /></td>
-                      {isAdmin && (
-                        <td>
-                          <div className="table-actions">
-                            <button className="btn btn-secondary btn-sm" onClick={() => { setEditTarget(emp); setShowForm(true); }} title="Edit"><EditIcon /></button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setShowResume(emp)} title="Upload Resume"><PaperclipIcon /></button>
-                            <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(emp)} title="Deactivate"><TrashIcon /></button>
-                          </div>
-                        </td>
+                      {isAdmin ? (
+                        <>
+                          <td className="td-muted">{emp.employee_id}</td>
+                          <td style={{ fontWeight: 600 }}>{emp.name}</td>
+                          <td className="td-muted">{emp.email}</td>
+                          <td className="td-muted">{emp.department_name || '—'}</td>
+                          <td className="td-muted">{emp.rank || '—'}</td>
+                          <td><Badge status={emp.role} /></td>
+                          <td className="td-muted">{emp.date_of_joining || '—'}</td>
+                          <td><Badge status={emp.is_active ? 'Active' : 'Inactive'} /></td>
+                          <td>
+                            <div className="table-actions">
+                              <button className="btn btn-secondary btn-sm" onClick={() => { setEditTarget(emp); setShowForm(true); }} title="Edit"><EditIcon /></button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => setShowResume(emp)} title="Upload Resume"><PaperclipIcon /></button>
+                              <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(emp)} title="Deactivate"><TrashIcon /></button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td style={{ fontWeight: 600 }}>{emp.name}</td>
+                          <td className="td-muted">{emp.rank || emp.role}</td>
+                          <td className="td-muted">{emp.department_name || '—'}</td>
+                          <td className="td-muted">{emp.email}</td>
+                          <td>
+                            <Badge
+                              status={
+                                emp.availability_status === 'Work From Home' ? 'WFH' :
+                                emp.availability_status === 'On Leave' ? 'Leave' :
+                                emp.availability_status === 'Present' ? 'Active' : 'Inactive'
+                              }
+                              label={emp.availability_status}
+                            />
+                          </td>
+                        </>
                       )}
                     </tr>
                   ))}

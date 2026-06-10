@@ -16,7 +16,7 @@ Endpoints:
 
 import os
 import bcrypt
-from datetime import datetime
+from datetime import datetime, date
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from werkzeug.utils import secure_filename
 from models import User, Department, LeaveBalance
@@ -74,16 +74,74 @@ def list_employees(current_user_id, current_user_role):
 
     pagination = query.order_by(User.name).paginate(page=page, per_page=per_page, error_out=False)
 
+    user = User.query.get(current_user_id)
+    user_dept_id = user.department_id if user else None
+
+    query = User.query.filter_by(is_active=True)
+
+    if current_user_role != "Admin":
+        if not user_dept_id:
+            # If user has no department, they see nobody
+            return jsonify({
+                "employees": [],
+                "total": 0,
+                "page": page,
+                "pages": 0,
+            }), 200
+        query = query.filter_by(department_id=user_dept_id)
+
+    if search:
+        like = f"%{search}%"
+        if current_user_role == "Admin":
+            query = query.filter(
+                (User.name.ilike(like)) | (User.employee_id.ilike(like)) | (User.email.ilike(like))
+            )
+        else:
+            query = query.filter(
+                (User.name.ilike(like)) | (User.email.ilike(like))
+            )
+    if department_id and current_user_role == "Admin":
+        query = query.filter_by(department_id=department_id)
+
+    pagination = query.order_by(User.name).paginate(page=page, per_page=per_page, error_out=False)
+
     if current_user_role == "Admin":
         employees = [
             e.to_dict(include_sensitive=True)
             for e in pagination.items
         ]
     else:
-        employees = [
-            {
+        # Determine availability statuses
+        today = date.today()
+        employees = []
+        for e in pagination.items:
+            # Availability status rules:
+            # 1. On Leave: if there is an approved Leave record for today (start_date <= today <= end_date) and leave_type is APL
+            # 2. Work From Home: if there is an approved WFH Leave record for today, or if they checked in and checked in from home (wait, WFH is standardly managed as a leave_type "WFH" in the leaves table)
+            # 3. Present: if they have checked in today and do not have an approved leave.
+            # 4. Unavailable: if not checked in today and no approved leave.
+            from models import Leave, Attendance
+            approved_leave = Leave.query.filter(
+                Leave.employee_id == e.id,
+                Leave.status == "Approved",
+                Leave.start_date <= today,
+                Leave.end_date >= today
+            ).first()
+
+            avail_status = "Unavailable"
+            if approved_leave:
+                if approved_leave.leave_type == "APL":
+                    avail_status = "On Leave"
+                elif approved_leave.leave_type == "WFH":
+                    avail_status = "Work From Home"
+            else:
+                # Check today's attendance
+                att = Attendance.query.filter_by(employee_id=e.id, date=today).first()
+                if att and att.check_in:
+                    avail_status = "Present"
+
+            employees.append({
                 "id": e.id,
-                "employee_id": e.employee_id,
                 "name": e.name,
                 "email": e.email,
                 "department_id": e.department_id,
@@ -91,10 +149,8 @@ def list_employees(current_user_id, current_user_role):
                 "rank": e.rank,
                 "role": e.role,
                 "is_active": e.is_active,
-                "date_of_joining": e.date_of_joining.isoformat() if e.date_of_joining else None,
-            }
-            for e in pagination.items
-        ]
+                "availability_status": avail_status
+            })
 
     return jsonify({
         "employees": employees,
@@ -194,9 +250,35 @@ def get_employee(emp_id, current_user_id, current_user_role):
     employee = User.query.get_or_404(emp_id)
 
     if current_user_role != "Admin" and current_user_id != emp_id:
+        # Check department matching
+        user = User.query.get(current_user_id)
+        if not user or user.department_id != employee.department_id or not user.department_id:
+            return jsonify({"error": "Access denied."}), 403
+
+        # Availability status calculation
+        from datetime import date
+        from models import Leave, Attendance
+        today = date.today()
+        approved_leave = Leave.query.filter(
+            Leave.employee_id == employee.id,
+            Leave.status == "Approved",
+            Leave.start_date <= today,
+            Leave.end_date >= today
+        ).first()
+
+        avail_status = "Unavailable"
+        if approved_leave:
+            if approved_leave.leave_type == "APL":
+                avail_status = "On Leave"
+            elif approved_leave.leave_type == "WFH":
+                avail_status = "Work From Home"
+        else:
+            att = Attendance.query.filter_by(employee_id=employee.id, date=today).first()
+            if att and att.check_in:
+                avail_status = "Present"
+
         return jsonify({
             "id": employee.id,
-            "employee_id": employee.employee_id,
             "name": employee.name,
             "email": employee.email,
             "department_id": employee.department_id,
@@ -204,7 +286,7 @@ def get_employee(emp_id, current_user_id, current_user_role):
             "rank": employee.rank,
             "role": employee.role,
             "is_active": employee.is_active,
-            "date_of_joining": employee.date_of_joining.isoformat() if employee.date_of_joining else None,
+            "availability_status": avail_status
         }), 200
 
     return jsonify(employee.to_dict(include_sensitive=(current_user_role == "Admin"))), 200

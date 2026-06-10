@@ -135,6 +135,27 @@ def apply_leave(current_user_id, current_user_role):
     if end < start:
         return jsonify({"error": "end_date must be on or after start_date."}), 422
 
+    resp_transfer_id = data.get("responsibility_transfer_id")
+    if not resp_transfer_id:
+        return jsonify({"error": "'responsibility_transfer_id' is required."}), 422
+
+    try:
+        resp_transfer_id = int(resp_transfer_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "'responsibility_transfer_id' must be an integer."}), 422
+
+    if resp_transfer_id == current_user_id:
+        return jsonify({"error": "You cannot assign responsibility transfer to yourself."}), 422
+
+    employee = User.query.get(current_user_id)
+    transfer_owner = User.query.get(resp_transfer_id)
+
+    if not transfer_owner or not transfer_owner.is_active:
+        return jsonify({"error": "Selected responsibility owner must be an active employee."}), 422
+
+    if not employee or employee.department_id != transfer_owner.department_id or not employee.department_id:
+        return jsonify({"error": "Selected responsibility owner must belong to your department."}), 422
+
     leave = Leave(
         employee_id=current_user_id,
         leave_type=leave_type,
@@ -142,6 +163,7 @@ def apply_leave(current_user_id, current_user_role):
         end_date=end,
         reason=data.get("reason", ""),
         status="Pending",
+        responsibility_transfer_id=resp_transfer_id,
     )
     db.session.add(leave)
     db.session.commit()
@@ -258,5 +280,29 @@ def action_leave(leave_id, current_user_id, current_user_role):
         )
     except Exception:
         pass
+
+    # Notify responsibility transfer owner if approved
+    if data["status"] == "Approved" and leave.responsibility_transfer_id:
+        try:
+            transfer_owner = User.query.get(leave.responsibility_transfer_id)
+            if transfer_owner and transfer_owner.email:
+                from utils.email_service import send_email_async
+                subject = "Leave Responsibility Transfer Assignment"
+                body = f"""
+                <h3 style="color: #4f46e5; margin-top: 0;">Responsibility Transfer Assignment</h3>
+                <p>Hello {transfer_owner.name},</p>
+                <p>You have been assigned as the temporary responsibility owner for <strong>{employee.name}</strong> during their leave period.</p>
+                <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+                <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Employee Name:</td><td style="padding: 6px 0; font-weight: 600;">{employee.name}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Leave Period:</td><td style="padding: 6px 0;">{leave.start_date.isoformat()} to {leave.end_date.isoformat()}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280; font-weight: 600;">Transfer Type:</td><td style="padding: 6px 0;">Temporary Responsibility Owner</td></tr>
+                </table>
+                """
+                from utils.email_service import HTML_TEMPLATE_WRAPPER
+                full_body = HTML_TEMPLATE_WRAPPER.format(content=body)
+                send_email_async(subject, full_body, transfer_owner.email)
+        except Exception:
+            pass
 
     return jsonify(leave.to_dict()), 200

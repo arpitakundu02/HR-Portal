@@ -13,7 +13,7 @@ import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
 import { getEmployees, getLeaveRequests, getDepartments, actionLeaveRequest, getMeetings, getTasks, getAttendanceHistory } from '../services/api';
 import { useToast } from '../components/common/Toast';
-import { UsersIcon, ClockIcon, DocumentTextIcon, ClipboardCheckIcon } from '../components/common/Icons';
+import { UsersIcon, ClockIcon, DocumentTextIcon, ClipboardCheckIcon, CalendarIcon, CheckIcon, CloseIcon, HourglassIcon, UserIcon } from '../components/common/Icons';
 
 const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#38bdf8', '#a78bfa', '#34d399', '#fb923c'];
 
@@ -162,15 +162,14 @@ export default function AdminDashboard() {
       <div className="grid-2" style={{ marginBottom: 24 }}>
         {/* Department distribution bar chart */}
         <div className="chart-card">
-          <div className="chart-title">👥 Department Distribution</div>
+          <div className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <UsersIcon style={{ width: 16, height: 16 }} /> Department Distribution
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={deptData} margin={{ top: 4, right: 16, left: -10, bottom: 40 }}>
               <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9' }}
-                cursor={{ fill: 'rgba(99,102,241,0.1)' }}
-              />
+              <Tooltip cursor={{ fill: 'rgba(99,102,241,0.1)' }} />
               <Bar dataKey="count" name="Employees" radius={[4, 4, 0, 0]}>
                 {deptData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
               </Bar>
@@ -180,7 +179,9 @@ export default function AdminDashboard() {
 
         {/* Leave status pie chart */}
         <div className="chart-card">
-          <div className="chart-title">📅 Leave Request Status</div>
+          <div className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <CalendarIcon style={{ width: 16, height: 16 }} /> Leave Request Status
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie data={leaveData} dataKey="value" nameKey="name" cx="50%" cy="50%"
@@ -190,7 +191,7 @@ export default function AdminDashboard() {
               >
                 {leaveData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
-              <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9' }} />
+              <Tooltip />
               <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 13 }} />
             </PieChart>
           </ResponsiveContainer>
@@ -201,7 +202,9 @@ export default function AdminDashboard() {
       <div className="grid-2" style={{ marginBottom: 24 }}>
         {/* Daily Attendance Donut Chart */}
         <div className="chart-card">
-          <div className="chart-title">⏰ Today's Attendance</div>
+          <div className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ClockIcon style={{ width: 16, height: 16 }} /> Today's Attendance
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie data={attendanceTodayData} dataKey="value" nameKey="name" cx="50%" cy="50%"
@@ -211,7 +214,7 @@ export default function AdminDashboard() {
               >
                 {attendanceTodayData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
-              <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9' }} />
+              <Tooltip />
               <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 13 }} />
             </PieChart>
           </ResponsiveContainer>
@@ -219,15 +222,14 @@ export default function AdminDashboard() {
 
         {/* Task Progress Chart */}
         <div className="chart-card">
-          <div className="chart-title">✅ Task Progress & Completion</div>
+          <div className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ClipboardCheckIcon style={{ width: 16, height: 16 }} /> Task Progress & Completion
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={taskData} margin={{ top: 4, right: 16, left: -10, bottom: 10 }}>
               <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9' }}
-                cursor={{ fill: 'rgba(99,102,241,0.1)' }}
-              />
+              <Tooltip cursor={{ fill: 'rgba(99,102,241,0.1)' }} />
               <Bar dataKey="value" name="Tasks" radius={[4, 4, 0, 0]}>
                 {taskData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Bar>
@@ -238,7 +240,9 @@ export default function AdminDashboard() {
 
       {/* Row 3: Meetings Density Line/Area Chart (Full Width) */}
       <div className="card" style={{ marginBottom: 24, padding: '20px 24px' }}>
-        <div className="chart-title" style={{ marginBottom: 16, fontWeight: 700, fontSize: 16 }}>📅 Meetings Density (Upcoming 7 Days)</div>
+        <div className="chart-title" style={{ marginBottom: 16, fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <CalendarIcon style={{ width: 16, height: 16 }} /> Meetings Density (Upcoming 7 Days)
+        </div>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={meetingsDensityData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <defs>
@@ -249,7 +253,7 @@ export default function AdminDashboard() {
             </defs>
             <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 12 }} />
             <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} allowDecimals={false} />
-            <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9' }} />
+            <Tooltip />
             <Area type="monotone" dataKey="count" name="Meetings Scheduled" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#colorMeetings)" />
           </AreaChart>
         </ResponsiveContainer>
@@ -259,13 +263,17 @@ export default function AdminDashboard() {
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <div>
-            <div className="card-title">⏳ Pending Leave Requests</div>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <HourglassIcon style={{ width: 16, height: 16, color: 'var(--warning)' }} /> Pending Leave Requests
+            </div>
             <div className="card-subtitle">Requires your action</div>
           </div>
         </div>
         {pendingLeaves.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🎉</div>
+            <div className="empty-state-icon">
+              <CheckIcon style={{ width: 48, height: 48, color: 'var(--success)' }} />
+            </div>
             <h3>All caught up!</h3>
             <p>No pending leave requests.</p>
           </div>
@@ -296,8 +304,12 @@ export default function AdminDashboard() {
                     </td>
                     <td>
                       <div className="table-actions">
-                        <button className="btn btn-success btn-sm" onClick={() => handleLeaveAction(l.id, 'Approved')}>✓ Approve</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleLeaveAction(l.id, 'Rejected')}>✕ Reject</button>
+                        <button className="btn btn-success btn-sm" onClick={() => handleLeaveAction(l.id, 'Approved')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <CheckIcon style={{ width: 12, height: 12 }} /> Approve
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleLeaveAction(l.id, 'Rejected')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <CloseIcon style={{ width: 12, height: 12 }} /> Reject
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -311,7 +323,9 @@ export default function AdminDashboard() {
       {/* Recent Employees */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">👤 Recent Employees</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <UserIcon style={{ width: 16, height: 16 }} /> Recent Employees
+          </div>
         </div>
         <div className="table-wrapper">
           <table>
@@ -338,3 +352,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

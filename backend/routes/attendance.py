@@ -12,7 +12,7 @@ Endpoints:
 
 from datetime import datetime, date
 from flask import Blueprint, request, jsonify, current_app
-from models import Attendance, User, SystemSetting
+from models import Attendance, User, SystemSetting, AttendanceAdjustment
 from extensions import db
 from utils.decorators import jwt_required, admin_required
 from utils.geo import is_within_office_radius
@@ -340,5 +340,240 @@ def test_email_config(current_user_id, current_user_role):
         return jsonify({"success": True, "message": f"Test email sent successfully to {recipient}!"}), 200
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500
+
+
+# Helper to parse ISO / standard datetime strings robustly
+def _parse_regularization_datetime(dt_str):
+    if not dt_str:
+        return None
+    if dt_str.endswith("Z"):
+        dt_str = dt_str[:-1]
+    dt_str = dt_str.replace("T", " ")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S.%f"):
+        try:
+            return datetime.strptime(dt_str, fmt)
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(dt_str)
+    except ValueError:
+        raise ValueError(f"Invalid datetime format: {dt_str}")
+
+
+# ------------------------------------------------------------------
+# POST /api/attendance/regularization
+# ------------------------------------------------------------------
+@attendance_bp.route("/regularization", methods=["POST"])
+@jwt_required
+def create_regularization(current_user_id, current_user_role):
+    """
+    Submit a new attendance regularization request.
+    Validations:
+      - No future dates.
+      - Within last 30 days.
+      - No duplicate Pending requests for same date.
+      - Reason length >= 10 characters.
+      - Monthly limit of 4 requests (all statuses: Pending, Approved, Rejected).
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON."}), 400
+
+    date_str = data.get("date")
+    check_in_str = data.get("check_in")
+    check_out_str = data.get("check_out")
+    reason = data.get("reason", "").strip()
+
+    if not date_str:
+        return jsonify({"error": "Date is required."}), 422
+    if not reason:
+        return jsonify({"error": "Reason is required."}), 422
+    if len(reason) < 10:
+        return jsonify({"error": "Reason must be at least 10 characters."}), 422
+
+    try:
+        req_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 422
+
+    # Check future date
+    if req_date > date.today():
+        return jsonify({"error": "Regularization requests for future dates are rejected."}), 422
+
+    # Check older than 30 days
+    days_ago = (date.today() - req_date).days
+    if days_ago > 30:
+        return jsonify({"error": "Regularization requests are restricted to dates within the last 30 days."}), 422
+
+    # Check duplicates for same date
+    duplicate = AttendanceAdjustment.query.filter_by(
+        employee_id=current_user_id,
+        date=req_date,
+        status="Pending"
+    ).first()
+    if duplicate:
+        return jsonify({"error": "A duplicate Pending regularization request already exists for this date."}), 409
+
+    # Check monthly request limit (all statuses: Pending, Approved, Rejected)
+    # Count requests created in the current calendar month
+    today = date.today()
+    start_of_month = datetime(today.year, today.month, 1)
+    monthly_count = AttendanceAdjustment.query.filter(
+        AttendanceAdjustment.employee_id == current_user_id,
+        AttendanceAdjustment.created_at >= start_of_month
+    ).count()
+
+    if monthly_count >= 4:
+        return jsonify({"error": "Monthly regularization limit (4 requests per month) has been reached."}), 429
+
+    # Parse requested datetimes
+    try:
+        check_in_dt = _parse_regularization_datetime(check_in_str)
+        check_out_dt = _parse_regularization_datetime(check_out_str)
+    except ValueError as val_err:
+        return jsonify({"error": str(val_err)}), 422
+
+    if check_in_dt and check_out_dt and check_out_dt <= check_in_dt:
+        return jsonify({"error": "Check-out time must be later than check-in time. Overnight shifts are currently not supported."}), 422
+
+    # Store original attendance values
+    existing_attendance = Attendance.query.filter_by(employee_id=current_user_id, date=req_date).first()
+    orig_in = existing_attendance.check_in if existing_attendance else None
+    orig_out = existing_attendance.check_out if existing_attendance else None
+
+    # Create Adjustment Request
+    req = AttendanceAdjustment(
+        employee_id=current_user_id,
+        date=req_date,
+        check_in=check_in_dt,
+        check_out=check_out_dt,
+        original_check_in=orig_in,
+        original_check_out=orig_out,
+        reason=reason,
+        status="Pending"
+    )
+    db.session.add(req)
+    db.session.commit()
+
+    # Notification to Admin
+    try:
+        employee = User.query.get(current_user_id)
+        from utils.email_service import send_regularization_notification
+        admin_email = current_app.config.get("ADMIN_NOTIFY_EMAIL", "admin@hrportal.com")
+        send_regularization_notification(
+            employee_name=employee.name,
+            employee_id=employee.employee_id,
+            date_str=date_str,
+            check_in_str=check_in_str,
+            check_out_str=check_out_str,
+            reason=reason,
+            recipient=admin_email
+        )
+    except Exception as notify_err:
+        current_app.logger.warning(f"Failed to send regularization email: {notify_err}")
+
+    return jsonify({"message": "Regularization request submitted successfully.", "request": req.to_dict()}), 201
+
+
+# ------------------------------------------------------------------
+# GET /api/attendance/regularization/history
+# ------------------------------------------------------------------
+@attendance_bp.route("/regularization/history", methods=["GET"])
+@jwt_required
+def regularization_history(current_user_id, current_user_role):
+    """
+    Get regularization requests history.
+    - Admin: view all requests.
+    - Employee: view own requests.
+    """
+    if current_user_role == "Admin":
+        history = AttendanceAdjustment.query.order_by(AttendanceAdjustment.created_at.desc()).all()
+    else:
+        history = AttendanceAdjustment.query.filter_by(employee_id=current_user_id).order_by(AttendanceAdjustment.created_at.desc()).all()
+
+    return jsonify([req.to_dict() for req in history]), 200
+
+
+# ------------------------------------------------------------------
+# POST /api/attendance/regularization/<int:id>/action
+# ------------------------------------------------------------------
+@attendance_bp.route("/regularization/<int:id>/action", methods=["POST"])
+@admin_required
+def action_regularization(id, current_user_id, current_user_role):
+    """
+    Action (Approve/Reject) an attendance regularization request.
+    Only accessible by Admin.
+    """
+    req = AttendanceAdjustment.query.get(id)
+    if not req:
+        return jsonify({"error": "Regularization request not found."}), 404
+
+    if req.status != "Pending":
+        return jsonify({"error": "This request has already been actioned."}), 400
+
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON."}), 400
+
+    status = data.get("status")
+    comment = data.get("comment", "").strip()
+
+    if status not in ["Approved", "Rejected"]:
+        return jsonify({"error": "Invalid action status. Must be 'Approved' or 'Rejected'."}), 422
+
+    req.status = status
+    req.approval_comment = comment if comment else None
+    req.actioned_by = current_user_id
+    req.actioned_at = datetime.utcnow()
+
+    # Approved logic: Update or Create Attendance Record
+    if status == "Approved":
+        if req.check_in and req.check_out and req.check_out <= req.check_in:
+            return jsonify({"error": "Check-out time must be later than check-in time. Overnight shifts are currently not supported."}), 422
+
+        attendance = Attendance.query.filter_by(employee_id=req.employee_id, date=req.date).first()
+        if attendance:
+            # Update existing record
+            attendance.check_in = req.check_in
+            attendance.check_out = req.check_out
+            attendance.calculate_hours()
+        else:
+            # Create new record ONLY when BOTH check_in and check_out are provided
+            if req.check_in and req.check_out:
+                new_att = Attendance(
+                    employee_id=req.employee_id,
+                    date=req.date,
+                    check_in=req.check_in,
+                    check_out=req.check_out
+                )
+                new_att.calculate_hours()
+                db.session.add(new_att)
+            else:
+                current_app.logger.warning(
+                    f"Approved regularization request {id} omitted creating attendance: missing check_in/out pair."
+                )
+
+    db.session.commit()
+
+    # Notification to Employee
+    try:
+        employee = User.query.get(req.employee_id)
+        from utils.email_service import send_regularization_notification
+        send_regularization_notification(
+            employee_name=employee.name,
+            employee_id=employee.employee_id,
+            date_str=req.date.isoformat(),
+            check_in_str=None,
+            check_out_str=None,
+            reason=req.reason,
+            recipient=employee.email,
+            status=status,
+            comment=comment
+        )
+    except Exception as notify_err:
+        current_app.logger.warning(f"Failed to send action email update: {notify_err}")
+
+    return jsonify({"message": f"Regularization request marked as {status}.", "request": req.to_dict()}), 200
+
 
 

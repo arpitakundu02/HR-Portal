@@ -14,8 +14,9 @@ import { useToast } from '../components/common/Toast';
 import {
   getLeaveBalances, applyLeave, getLeaveHistory,
   getLeaveRequests, actionLeaveRequest, assignLeaveBalance, getEmployees,
+  getDepartments,
 } from '../services/api';
-import { PlusIcon, CheckIcon, CloseIcon, SaveIcon, InboxIcon } from '../components/common/Icons';
+import { PlusIcon, CheckIcon, CloseIcon, SaveIcon, InboxIcon, HourglassIcon, ClipboardCheckIcon, UserIcon, ChartBarIcon, ShieldAlertIcon, HomeIcon, DownloadIcon } from '../components/common/Icons';
 
 export default function Leaves() {
   const { isAdmin } = useAuth();
@@ -24,14 +25,14 @@ export default function Leaves() {
   const [tab, setTab] = useState(isAdmin ? 'pending' : 'apply');
 
   const ADMIN_TABS  = [
-    { key: 'pending',        label: '⏳ Pending Requests' },
-    { key: 'all-requests',   label: '📋 All Requests' },
-    { key: 'assign-balance', label: '💳 Assign Balance' },
+    { key: 'pending',        label: 'Pending Requests', icon: <HourglassIcon style={{ marginRight: 6 }} /> },
+    { key: 'all-requests',   label: 'All Requests', icon: <ClipboardCheckIcon style={{ marginRight: 6 }} /> },
+    { key: 'assign-balance', label: 'Assign Balance', icon: <UserIcon style={{ marginRight: 6 }} /> },
   ];
   const EMP_TABS = [
-    { key: 'apply',          label: '➕ Apply Leave' },
-    { key: 'my-history',     label: '📋 My History' },
-    { key: 'my-balance',     label: '💳 My Balance' },
+    { key: 'apply',          label: 'Apply Leave', icon: <PlusIcon style={{ marginRight: 6 }} /> },
+    { key: 'my-history',     label: 'My History', icon: <ClipboardCheckIcon style={{ marginRight: 6 }} /> },
+    { key: 'my-balance',     label: 'My Balance', icon: <UserIcon style={{ marginRight: 6 }} /> },
   ];
   const tabs = isAdmin ? [...ADMIN_TABS, ...EMP_TABS] : EMP_TABS;
 
@@ -46,8 +47,8 @@ export default function Leaves() {
 
       <div className="tabs">
         {tabs.map((t) => (
-          <button key={t.key} className={`tab-btn ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>
-            {t.label}
+          <button key={t.key} className={`tab-btn ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            {t.icon}{t.label}
           </button>
         ))}
       </div>
@@ -103,15 +104,16 @@ function ApplyLeave({ toast }) {
         <div className="card-header"><div className="card-title">Recent Requests</div></div>
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Applied On</th></tr></thead>
+            <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Backup Cover</th><th>Status</th><th>Applied On</th></tr></thead>
             <tbody>
-              {recent.length === 0 && <tr><td colSpan={6}><div className="empty-state"><div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div><h3>No requests yet</h3></div></td></tr>}
+              {recent.length === 0 && <tr><td colSpan={7}><div className="empty-state"><div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div><h3>No requests yet</h3></div></td></tr>}
               {recent.map((l) => (
                 <tr key={l.id}>
                   <td><Badge status={l.leave_type} /></td>
                   <td className="td-muted">{l.start_date}</td>
                   <td className="td-muted">{l.end_date}</td>
                   <td>{l.days_requested}</td>
+                  <td className="td-muted">{l.responsibility_transfer_name || '—'}</td>
                   <td><Badge status={l.status} /></td>
                   <td className="td-muted">{new Date(l.created_at).toLocaleDateString()}</td>
                 </tr>
@@ -169,15 +171,16 @@ function MyHistory({ toast }) {
         {loading ? <Spinner /> : (
           <div className="table-wrapper">
             <table>
-              <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Status</th><th>Applied</th></tr></thead>
+              <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Backup Cover</th><th>Reason</th><th>Status</th><th>Applied</th></tr></thead>
               <tbody>
-                {history.length === 0 && <tr><td colSpan={7}><div className="empty-state"><div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div><h3>No records found</h3></div></td></tr>}
+                {history.length === 0 && <tr><td colSpan={8}><div className="empty-state"><div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div><h3>No records found</h3></div></td></tr>}
                 {history.map((l) => (
                   <tr key={l.id}>
                     <td><Badge status={l.leave_type} /></td>
                     <td className="td-muted">{l.start_date}</td>
                     <td className="td-muted">{l.end_date}</td>
                     <td>{l.days_requested}</td>
+                    <td className="td-muted">{l.responsibility_transfer_name || '—'}</td>
                     <td className="td-muted" style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.reason || '—'}</td>
                     <td><Badge status={l.status} /></td>
                     <td className="td-muted">{new Date(l.created_at).toLocaleDateString()}</td>
@@ -212,7 +215,9 @@ function MyBalance({ toast }) {
     <div className="stats-grid">
       {balances.map((b) => (
         <div key={b.leave_type} className="card">
-          <div style={{ fontSize: 36, marginBottom: 12 }}>{b.leave_type === 'APL' ? '📋' : '🏠'}</div>
+          <div style={{ fontSize: 24, marginBottom: 12, display: 'inline-flex', alignItems: 'center' }}>
+            {b.leave_type === 'APL' ? <ClipboardCheckIcon style={{ width: 24, height: 24 }} /> : <HomeIcon style={{ width: 24, height: 24 }} />}
+          </div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
             {b.leave_type === 'APL' ? 'All Purpose Leave' : 'Work From Home'}
           </div>
@@ -232,8 +237,8 @@ function MyBalance({ toast }) {
             </div>
           </div>
           {b.remaining < 0 && (
-            <div className="alert alert-warning" style={{ marginTop: 12, padding: '8px 12px', fontSize: 12 }}>
-              ⚠️ Negative balance — {Math.abs(b.remaining)} day{Math.abs(b.remaining) !== 1 ? 's' : ''} overdrawn
+            <div className="alert alert-warning" style={{ marginTop: 12, padding: '8px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <ShieldAlertIcon style={{ width: 14, height: 14 }} /> Negative balance — {Math.abs(b.remaining)} day{Math.abs(b.remaining) !== 1 ? 's' : ''} overdrawn
             </div>
           )}
         </div>
@@ -270,16 +275,18 @@ function PendingRequests({ toast }) {
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">⏳ Pending Leave Requests</div>
+        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <HourglassIcon style={{ width: 16, height: 16 }} /> Pending Leave Requests
+        </div>
         <div className="card-subtitle">{requests.length} awaiting action</div>
       </div>
       <div className="table-wrapper">
         <table>
           <thead>
-            <tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Applied On</th><th>Actions</th></tr>
+            <tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Backup Cover</th><th>Reason</th><th>Applied On</th><th>Actions</th></tr>
           </thead>
           <tbody>
-            {requests.length === 0 && <tr><td colSpan={8}><div className="empty-state"><div className="empty-state-icon">🎉</div><h3>No pending requests</h3></div></td></tr>}
+            {requests.length === 0 && <tr><td colSpan={9}><div className="empty-state"><div className="empty-state-icon"><CheckIcon style={{ width: 48, height: 48, color: 'var(--success)' }} /></div><h3>No pending requests</h3></div></td></tr>}
             {requests.map((l) => (
               <tr key={l.id}>
                 <td style={{ fontWeight: 600 }}>{l.employee_name}</td>
@@ -287,12 +294,13 @@ function PendingRequests({ toast }) {
                 <td className="td-muted">{l.start_date}</td>
                 <td className="td-muted">{l.end_date}</td>
                 <td>{l.days_requested}</td>
+                <td className="td-muted">{l.responsibility_transfer_name || '—'}</td>
                 <td className="td-muted" style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.reason || '—'}</td>
                 <td className="td-muted">{new Date(l.created_at).toLocaleDateString()}</td>
                 <td>
                   <div className="table-actions">
-                    <button className="btn btn-success btn-sm" onClick={() => action(l.id, 'Approved')}><CheckIcon style={{ marginRight: 4 }} /> Approve</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => action(l.id, 'Rejected')}><CloseIcon style={{ marginRight: 4 }} /> Reject</button>
+                    <button className="btn btn-success btn-sm" onClick={() => action(l.id, 'Approved')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckIcon style={{ width: 12, height: 12 }} /> Approve</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => action(l.id, 'Rejected')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CloseIcon style={{ width: 12, height: 12 }} /> Reject</button>
                   </div>
                 </td>
               </tr>
@@ -310,6 +318,14 @@ function AllRequests({ toast }) {
   const [loading,      setLoading]      = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter,   setTypeFilter]   = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate,   setEndDate]   = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
+  const [departments, setDepartments] = useState([]);
+
+  useEffect(() => {
+    getDepartments().then((r) => setDepartments(r.data));
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -317,17 +333,50 @@ function AllRequests({ toast }) {
       try {
         const params = { status: statusFilter };
         if (typeFilter) params.leave_type = typeFilter;
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
+        if (deptFilter) params.department = deptFilter;
         const { data } = await getLeaveHistory(params);
         setRequests(data);
       } catch { toast.error('Failed to load requests.'); }
       finally { setLoading(false); }
     })();
     // eslint-disable-next-line
-  }, [statusFilter, typeFilter]);
+  }, [statusFilter, typeFilter, startDate, endDate, deptFilter]);
+
+  const handleExport = () => {
+    const params = new URLSearchParams();
+    if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+    if (typeFilter) params.append('leave_type', typeFilter);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (deptFilter) params.append('department', deptFilter);
+    
+    const token = sessionStorage.getItem('hr_token');
+    
+    // Download file
+    fetch(`/api/exports/leaves?${params.toString()}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Export failed.');
+      return res.blob();
+    })
+    .then(blob => {
+      const blobUrl = window.URL.createObjectURL(blob);
+      const tempLink = document.createElement('a');
+      tempLink.href = blobUrl;
+      tempLink.setAttribute('download', `Leave_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
+    })
+    .catch(() => toast.error('Failed to export leave report.'));
+  };
 
   return (
     <div>
-      <div className="search-filter-row">
+      <div className="search-filter-row" style={{ flexWrap: 'wrap', gap: 10 }}>
         <select className="form-control filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="all">All Statuses</option>
           <option value="Pending">Pending</option>
@@ -339,14 +388,29 @@ function AllRequests({ toast }) {
           <option value="APL">APL</option>
           <option value="WFH">WFH</option>
         </select>
+        <select className="form-control filter-select" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+          <option value="">All Departments</option>
+          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>From:</label>
+          <input type="date" className="form-control" style={{ width: 140 }} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>To:</label>
+          <input type="date" className="form-control" style={{ width: 140 }} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+        <button className="btn btn-secondary" onClick={handleExport} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <DownloadIcon style={{ width: 14, height: 14 }} /> Export Report
+        </button>
       </div>
       <div className="card">
         {loading ? <Spinner /> : (
           <div className="table-wrapper">
             <table>
-              <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Actioned By</th><th>Applied</th></tr></thead>
+              <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Backup Cover</th><th>Status</th><th>Actioned By</th><th>Applied</th></tr></thead>
               <tbody>
-                {requests.length === 0 && <tr><td colSpan={8}><div className="empty-state"><div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div><h3>No records</h3></div></td></tr>}
+                {requests.length === 0 && <tr><td colSpan={9}><div className="empty-state"><div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div><h3>No records</h3></div></td></tr>}
                 {requests.map((l) => (
                   <tr key={l.id}>
                     <td style={{ fontWeight: 600 }}>{l.employee_name}</td>
@@ -354,6 +418,7 @@ function AllRequests({ toast }) {
                     <td className="td-muted">{l.start_date}</td>
                     <td className="td-muted">{l.end_date}</td>
                     <td>{l.days_requested}</td>
+                    <td className="td-muted">{l.responsibility_transfer_name || '—'}</td>
                     <td><Badge status={l.status} /></td>
                     <td className="td-muted">{l.actioned_by || '—'}</td>
                     <td className="td-muted">{new Date(l.created_at).toLocaleDateString()}</td>
@@ -405,7 +470,11 @@ function AssignBalance({ toast }) {
   return (
     <div className="grid-2">
       <div className="card">
-        <div className="card-header"><div className="card-title">💳 Assign Leave Balance</div></div>
+        <div className="card-header">
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <UserIcon style={{ width: 16, height: 16 }} /> Assign Leave Balance
+          </div>
+        </div>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Employee <span className="form-required">*</span></label>
@@ -432,7 +501,11 @@ function AssignBalance({ toast }) {
       </div>
 
       <div className="card">
-        <div className="card-header"><div className="card-title">📊 Current Balances</div></div>
+        <div className="card-header">
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ChartBarIcon style={{ width: 16, height: 16 }} /> Current Balances
+          </div>
+        </div>
         {form.employee_id && balances.length > 0 ? balances.map((b) => (
           <div key={b.leave_type} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>{b.leave_type === 'APL' ? 'All Purpose Leave' : 'Work From Home'}</div>
@@ -444,7 +517,7 @@ function AssignBalance({ toast }) {
           </div>
         )) : (
           <div className="empty-state" style={{ padding: 30 }}>
-            <div className="empty-state-icon">👤</div>
+            <div className="empty-state-icon"><UserIcon style={{ width: 48, height: 48 }} /></div>
             <p>Select an employee to view their balances</p>
           </div>
         )}

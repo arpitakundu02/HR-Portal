@@ -26,7 +26,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
       sessionStorage.removeItem('hr_token');
       sessionStorage.removeItem('hr_user');
       window.location.href = '/login';
@@ -59,9 +59,11 @@ export const uploadResume = (id, formData) =>
    DEPARTMENTS
    ================================================================ */
 export const getDepartments    = ()           => api.get('/departments/');
+export const getDepartmentDetails = (id)      => api.get(`/departments/${id}`);
 export const createDepartment  = (data)       => api.post('/departments/', data);
 export const updateDepartment  = (id, data)   => api.put(`/departments/${id}`, data);
 export const deleteDepartment  = (id)         => api.delete(`/departments/${id}`);
+
 
 /* ================================================================
    LEAVES
@@ -98,5 +100,12 @@ export const getTasks    = (params)      => api.get('/tasks/', { params });
 export const createTask  = (data)        => api.post('/tasks/', data);
 export const updateTask  = (id, data)    => api.put(`/tasks/${id}`, data);
 export const deleteTask  = (id)          => api.delete(`/tasks/${id}`);
+
+/* ================================================================
+   ATTENDANCE REGULARIZATION
+   ================================================================ */
+export const getRegularizationHistory  = ()                     => api.get('/attendance/regularization/history');
+export const createRegularizationRequest = (data)               => api.post('/attendance/regularization', data);
+export const actionRegularizationRequest = (id, status, comment) => api.post(`/attendance/regularization/${id}/action`, { status, comment });
 
 export default api;

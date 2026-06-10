@@ -20,6 +20,7 @@ from routes.leaves import leaves_bp
 from routes.attendance import attendance_bp
 from routes.meetings import meetings_bp
 from routes.tasks import tasks_bp
+from routes.exports import exports_bp
 
 
 def create_app(config_class=Config) -> Flask:
@@ -50,6 +51,7 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(attendance_bp,  url_prefix="/api/attendance")
     app.register_blueprint(meetings_bp,    url_prefix="/api/meetings")
     app.register_blueprint(tasks_bp,       url_prefix="/api/tasks")
+    app.register_blueprint(exports_bp,     url_prefix="/api/exports")
 
     # ------------------------------------------------------------------ #
     # Health check
