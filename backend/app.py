@@ -27,6 +27,12 @@ from routes.profile import profile_bp
 from routes.notifications import notifications_bp
 from routes.announcements import announcements_bp
 from routes.work_transfers import work_transfers_bp
+from routes.registrations import registrations_bp
+from routes.comp_off import comp_off_bp
+from routes.timesheets import timesheets_bp
+from routes.team_dashboard import team_dashboard_bp
+from routes.hierarchy import hierarchy_bp
+from routes.policies import policies_bp
 
 
 def create_app(config_class=Config) -> Flask:
@@ -64,6 +70,12 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(notifications_bp, url_prefix="/api/notifications")
     app.register_blueprint(announcements_bp, url_prefix="/api/announcements")
     app.register_blueprint(work_transfers_bp, url_prefix="/api/work-transfers")
+    app.register_blueprint(registrations_bp, url_prefix="/api/registrations")
+    app.register_blueprint(comp_off_bp,    url_prefix="/api/comp-off")
+    app.register_blueprint(timesheets_bp,  url_prefix="/api/timesheets")
+    app.register_blueprint(team_dashboard_bp, url_prefix="/api/team-dashboard")
+    app.register_blueprint(hierarchy_bp,       url_prefix="/api/hierarchy")
+    app.register_blueprint(policies_bp,        url_prefix="/api/policies")
 
     # ------------------------------------------------------------------ #
     # Health check

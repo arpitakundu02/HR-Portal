@@ -174,7 +174,7 @@ function DepartmentDetails({ deptId, onBack }) {
                     <td className="td-muted">{e.employee_id}</td>
                     <td style={{ fontWeight: 600 }}>{e.name}</td>
                     <td className="td-muted">{e.email}</td>
-                    <td><Badge status={e.role} /></td>
+                    <td><Badge status={e.is_line_manager ? 'Line Manager' : e.role} /></td>
                     <td className="td-muted">{e.rank || '—'}</td>
                     <td><Badge status={e.is_active ? 'Active' : 'Inactive'} /></td>
                   </tr>

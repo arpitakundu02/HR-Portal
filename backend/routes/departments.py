@@ -114,11 +114,12 @@ def get_department_details(dept_id, current_user_id, current_user_role):
     today = date.today()
     present_today = 0
     if emp_ids:
-        present_today = Attendance.query.filter(
+        present_records = Attendance.query.filter(
             Attendance.employee_id.in_(emp_ids),
             Attendance.date == today,
             Attendance.check_in != None
-        ).count()
+        ).all()
+        present_today = sum(1 for r in present_records if r.get_status() in ("Present", "Half Day"))
 
     # 3. Employees on leave today
     on_leave_today = 0
@@ -169,6 +170,7 @@ def get_department_details(dept_id, current_user_id, current_user_role):
             "email": e.email,
             "role": e.role,
             "rank": e.rank,
+            "is_line_manager": e.is_line_manager,
             "is_active": e.is_active
         })
 

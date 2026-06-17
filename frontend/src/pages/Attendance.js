@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/common/Spinner';
+import Badge from '../components/common/Badge';
 import Pagination from '../components/common/Pagination';
 import { useToast } from '../components/common/Toast';
 import {
@@ -16,7 +17,9 @@ import {
   getOfficeSettings,
   getRegularizationHistory,
   createRegularizationRequest,
-  actionRegularizationRequest
+  actionRegularizationRequest,
+  getTeamDashboardMetadata,
+  getTeamAttendance
 } from '../services/api';
 import { MapContainer, TileLayer, Marker, Circle, useMap, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -74,6 +77,7 @@ export default function Attendance() {
   const { isAdmin } = useAuth();
   const toast = useToast();
 
+  const [isSupervisor, setIsSupervisor] = useState(false);
   const [tab,      setTab]      = useState('attendance');
   const [status,   setStatus]   = useState(null);
   const [history,  setHistory]  = useState([]);
@@ -144,6 +148,15 @@ export default function Attendance() {
     loadStatus();
     fetchOfficeAndTrack();
     if (isAdmin) getEmployees({ per_page: 200 }).then((r) => setEmployees(r.data.employees || []));
+    if (!isAdmin) {
+      getTeamDashboardMetadata()
+        .then((res) => {
+          if (res.data.is_supervisor) {
+            setIsSupervisor(true);
+          }
+        })
+        .catch(() => {});
+    }
     // eslint-disable-next-line
   }, [isAdmin]);
 
@@ -313,6 +326,11 @@ export default function Attendance() {
         <button className={`tab-btn ${tab === 'attendance' ? 'active' : ''}`} onClick={() => setTab('attendance')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <ClockIcon /> {isAdmin ? 'History Logs' : 'Check-In / History'}
         </button>
+        {isSupervisor && (
+          <button className={`tab-btn ${tab === 'team-attendance' ? 'active' : ''}`} onClick={() => setTab('team-attendance')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <ClockIcon /> Team Attendance
+          </button>
+        )}
         <button className={`tab-btn ${tab === 'regularization' ? 'active' : ''}`} onClick={() => setTab('regularization')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <HourglassIcon /> Regularizations {isAdmin ? 'Queue' : 'Requests'}
         </button>
@@ -524,50 +542,46 @@ export default function Attendance() {
               <div className="form-group" style={{ margin: 0 }}>
                 <input type="month" className="form-control" value={month} onChange={(e) => { setMonth(e.target.value); setPage(1); }} />
               </div>
-              {isAdmin && (
-                <>
-                  <select className="form-control filter-select" value={empFilter} onChange={(e) => { setEmpFilter(e.target.value); setPage(1); }}>
-                    <option value="">All Employees</option>
-                    {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </select>
-                  <button 
-                    className="btn btn-secondary" 
-                    onClick={() => {
-                      const params = new URLSearchParams();
-                      if (month) {
-                        // Extract year and month
-                        const [y, m] = month.split('-');
-                        const daysInMonth = new Date(y, m, 0).getDate();
-                        params.append('start_date', `${month}-01`);
-                        params.append('end_date', `${month}-${daysInMonth}`);
-                      }
-                      if (empFilter) params.append('employee_id', empFilter);
-                      
-                      const token = sessionStorage.getItem('hr_token');
-                      fetch(`/api/exports/attendance?${params.toString()}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      })
-                      .then(res => {
-                        if (!res.ok) throw new Error('Export failed.');
-                        return res.blob();
-                      })
-                      .then(blob => {
-                        const blobUrl = window.URL.createObjectURL(blob);
-                        const tempLink = document.createElement('a');
-                        tempLink.href = blobUrl;
-                        tempLink.setAttribute('download', `Attendance_Report_${month || new Date().toISOString().slice(0,7)}.xlsx`);
-                        document.body.appendChild(tempLink);
-                        tempLink.click();
-                        document.body.removeChild(tempLink);
-                      })
-                      .catch(() => toast.error('Failed to export attendance report.'));
-                    }}
-                    style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <DownloadIcon style={{ width: 14, height: 14 }} /> Export Report
-                  </button>
-                </>
-              )}
+              <select className="form-control filter-select" value={empFilter} onChange={(e) => { setEmpFilter(e.target.value); setPage(1); }} disabled={!isAdmin && !isSupervisor}>
+                <option value="">All Employees</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (month) {
+                    // Extract year and month
+                    const [y, m] = month.split('-');
+                    const daysInMonth = new Date(y, m, 0).getDate();
+                    params.append('start_date', `${month}-01`);
+                    params.append('end_date', `${month}-${daysInMonth}`);
+                  }
+                  if (empFilter) params.append('employee_id', empFilter);
+                  
+                  const token = sessionStorage.getItem('hr_token');
+                  fetch(`/api/exports/attendance?${params.toString()}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                  })
+                  .then(res => {
+                    if (!res.ok) throw new Error('Export failed.');
+                    return res.blob();
+                  })
+                  .then(blob => {
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const tempLink = document.createElement('a');
+                    tempLink.href = blobUrl;
+                    tempLink.setAttribute('download', `Attendance_Report_${month || new Date().toISOString().slice(0,7)}.xlsx`);
+                    document.body.appendChild(tempLink);
+                    tempLink.click();
+                    document.body.removeChild(tempLink);
+                  })
+                  .catch(() => toast.error('Failed to export attendance report.'));
+                }}
+                style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <DownloadIcon style={{ width: 14, height: 14 }} /> Export Report
+              </button>
             </div>
 
             {loading ? <Spinner /> : (
@@ -608,9 +622,7 @@ export default function Attendance() {
                               {hours > 0 ? `${hours.toFixed(2)}h` : '—'}
                             </td>
                             <td>
-                              <span className={`badge ${r.check_out ? 'badge-approved' : r.check_in ? 'badge-in-progress' : 'badge-pending'}`}>
-                                {r.check_out ? 'Complete' : r.check_in ? 'In Progress' : 'Absent'}
-                              </span>
+                              <Badge status={r.attendance_status} />
                             </td>
                           </tr>
                         );
@@ -624,6 +636,8 @@ export default function Attendance() {
             )}
           </div>
         </>
+      ) : tab === 'team-attendance' ? (
+        <TeamAttendance toast={toast} />
       ) : (
         isAdmin ? <AdminRegularizations /> : <EmployeeRegularization />
       )}
@@ -1002,6 +1016,101 @@ function AdminRegularizations() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function TeamAttendance({ toast }) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dateFilter, setDateFilter] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (dateFilter) params.date = dateFilter;
+      const { data } = await getTeamAttendance(params);
+      setRecords(data);
+    } catch {
+      toast.error('Failed to load team attendance records.');
+    } finally {
+      setLoading(false);
+    }
+  }, [dateFilter, toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleClear = () => {
+    setDateFilter('');
+  };
+
+  return (
+    <div>
+      <div className="search-filter-row" style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>Date Filter:</label>
+          <input
+            type="date"
+            className="form-control"
+            style={{ width: 180 }}
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
+        </div>
+        {dateFilter && (
+          <button className="btn btn-secondary" onClick={handleClear}>
+            Clear Filter
+          </button>
+        )}
+      </div>
+
+      <div className="card">
+        {loading ? <Spinner /> : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee Name</th>
+                  <th>Date</th>
+                  <th>Check In</th>
+                  <th>Check Out</th>
+                  <th>Working Hours</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.length === 0 && (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="empty-state">
+                        <div className="empty-state-icon">
+                          <InboxIcon style={{ width: 48, height: 48 }} />
+                        </div>
+                        <h3>No records found</h3>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {records.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ fontWeight: 600 }}>{r.employee_name}</td>
+                    <td className="td-muted">{r.date}</td>
+                    <td className="td-muted">{r.check_in ? new Date(r.check_in).toLocaleTimeString() : '—'}</td>
+                    <td className="td-muted">{r.check_out ? new Date(r.check_out).toLocaleTimeString() : '—'}</td>
+                    <td>{r.working_hours} hrs</td>
+                    <td>
+                      <Badge status={r.attendance_status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

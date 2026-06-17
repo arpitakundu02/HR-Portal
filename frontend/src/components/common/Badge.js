@@ -10,11 +10,18 @@ const STATUS_CLASS = {
   'In Progress': 'badge-in-progress',
   'Admin':       'badge-admin',
   'Employee':    'badge-employee',
+  'Line Manager':'badge-in-progress',
   'Active':      'badge-active',
   'Inactive':    'badge-inactive',
   'APL':         'badge-apl',
   'WFH':         'badge-wfh',
   'Leave':       'badge-rejected',
+  'Active / Present': 'badge-active',
+  'Present':     'badge-active',
+  'Half Day':    'badge-pending',
+  'Absent':      'badge-inactive',
+  'Work From Home': 'badge-wfh',
+  'On Leave':    'badge-rejected',
 };
 
 export default function Badge({ status, label }) {

@@ -7,9 +7,9 @@ import StatCard from '../components/common/StatCard';
 import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
 import AnnouncementWidget from '../components/common/AnnouncementWidget';
-import { getLeaveBalances, getTodayStatus, getTasks, getMeetings, getHolidays } from '../services/api';
+import { getLeaveBalances, getTodayStatus, getTasks, getMeetings, getHolidays, getPoliciesStats } from '../services/api';
 import { useToast } from '../components/common/Toast';
-import { DocumentTextIcon, HomeIcon, ClipboardCheckIcon, UserGroupIcon, InboxIcon, ClockIcon, CalendarIcon, CheckIcon, UsersIcon } from '../components/common/Icons';
+import { DocumentTextIcon, HomeIcon, ClipboardCheckIcon, UserGroupIcon, InboxIcon, ClockIcon, CalendarIcon, CheckIcon, UsersIcon, ShieldCheckIcon } from '../components/common/Icons';
 
 export default function EmployeeDashboard() {
   const toast    = useToast();
@@ -19,23 +19,26 @@ export default function EmployeeDashboard() {
   const [tasks,      setTasks]      = useState([]);
   const [meetings,   setMeetings]   = useState([]);
   const [holidays,   setHolidays]   = useState([]);
+  const [policyStats, setPolicyStats] = useState(null);
   const [loading,    setLoading]    = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [balRes, attRes, taskRes, meetRes, holRes] = await Promise.all([
+        const [balRes, attRes, taskRes, meetRes, holRes, polRes] = await Promise.all([
           getLeaveBalances(),
           getTodayStatus(),
           getTasks({ status: 'Pending' }),
           getMeetings({ upcoming: true }),
-          getHolidays({ upcoming: true, limit: 3 })
+          getHolidays({ upcoming: true, limit: 3 }),
+          getPoliciesStats()
         ]);
         setBalances(balRes.data);
         setAttendance(attRes.data);
         setTasks(taskRes.data.tasks || []);
         setMeetings(meetRes.data || []);
         setHolidays(holRes.data || []);
+        setPolicyStats(polRes.data);
       } catch {
         toast.error('Failed to load dashboard data.');
       } finally {
@@ -208,40 +211,90 @@ export default function EmployeeDashboard() {
         )}
       </div>
 
-      {/* Upcoming Holidays Widget */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <CalendarIcon style={{ width: 16, height: 16 }} /> Upcoming Holidays
+      {/* Bottom Widgets: Company Policies + Upcoming Holidays */}
+      <div className="grid-2" style={{ marginBottom: 24 }}>
+        {/* Company Policies Widget */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <DocumentTextIcon style={{ width: 16, height: 16 }} /> Company Policies
+            </div>
           </div>
-        </div>
-        {holidays.length === 0 ? (
-          <div className="empty-state" style={{ padding: 30 }}>
-            <div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div>
-            <h3>No upcoming holidays</h3>
-          </div>
-        ) : (
-          holidays.map((h) => (
-            <div key={h.id} style={{
-              display: 'flex', gap: 14, padding: '14px 0',
-              borderBottom: '1px solid var(--border)',
-            }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 10,
-                background: 'var(--accent-glow)', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', flexShrink: 0,
-              }}>
-                <CalendarIcon style={{ width: 20, height: 20, color: 'var(--accent-light)' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{h.name}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {new Date(h.date).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-elevated)' }}>
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total Policies</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent-light)', marginTop: 4 }}>
+                  {policyStats?.total_policies ?? 0}
                 </div>
               </div>
+              <DocumentTextIcon style={{ width: 32, height: 32, color: 'var(--accent)', opacity: 0.8 }} />
             </div>
-          ))
-        )}
+
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>Recently Updated</div>
+              {!policyStats?.recently_updated || policyStats.recently_updated.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', padding: '10px 0' }}>
+                  No recently updated policies.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {policyStats.recently_updated.slice(0, 3).map((p) => (
+                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, marginRight: 12 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={p.title}>
+                          {p.title}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.category}</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {new Date(p.updated_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Holidays Widget */}
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div className="card-header">
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CalendarIcon style={{ width: 16, height: 16 }} /> Upcoming Holidays
+            </div>
+          </div>
+          {holidays.length === 0 ? (
+            <div className="empty-state" style={{ padding: 30 }}>
+              <div className="empty-state-icon"><InboxIcon style={{ width: 48, height: 48 }} /></div>
+              <h3>No upcoming holidays</h3>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {holidays.map((h) => (
+                <div key={h.id} style={{
+                  display: 'flex', gap: 12, paddingBottom: 10,
+                  borderBottom: '1px solid var(--border)',
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 8,
+                    background: 'var(--accent-glow)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <CalendarIcon style={{ width: 18, height: 18, color: 'var(--accent-light)' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{h.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {new Date(h.date).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

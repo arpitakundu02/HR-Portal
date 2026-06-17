@@ -240,7 +240,7 @@ export default function WorkTransfers() {
               <option value="">-- Select Employee --</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.first_name} {emp.last_name} ({emp.email})
+                  {emp.name} ({emp.department_name || 'No Department'})
                 </option>
               ))}
             </select>

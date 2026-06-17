@@ -14,27 +14,48 @@ import { useToast } from '../components/common/Toast';
 import {
   getLeaveBalances, applyLeave, getLeaveHistory,
   getLeaveRequests, actionLeaveRequest, assignLeaveBalance, getEmployees,
-  getDepartments,
+  getDepartments, getTeamDashboardMetadata, getTeamLeaves
 } from '../services/api';
-import { PlusIcon, CheckIcon, CloseIcon, SaveIcon, InboxIcon, HourglassIcon, ClipboardCheckIcon, UserIcon, ChartBarIcon, ShieldAlertIcon, HomeIcon, DownloadIcon } from '../components/common/Icons';
+import { PlusIcon, CheckIcon, CloseIcon, SaveIcon, InboxIcon, HourglassIcon, ClipboardCheckIcon, UserIcon, ChartBarIcon, ShieldAlertIcon, HomeIcon, DownloadIcon, UsersIcon } from '../components/common/Icons';
 
 export default function Leaves() {
   const { isAdmin } = useAuth();
   const toast = useToast();
 
+  const [isSupervisor, setIsSupervisor] = useState(false);
   const [tab, setTab] = useState(isAdmin ? 'pending' : 'apply');
+
+  useEffect(() => {
+    if (!isAdmin) {
+      getTeamDashboardMetadata()
+        .then((res) => {
+          if (res.data.is_supervisor) {
+            setIsSupervisor(true);
+            setTab('team-leaves'); // Default supervisor to team leaves
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAdmin]);
 
   const ADMIN_TABS  = [
     { key: 'pending',        label: 'Pending Requests', icon: <HourglassIcon style={{ marginRight: 6 }} /> },
     { key: 'all-requests',   label: 'All Requests', icon: <ClipboardCheckIcon style={{ marginRight: 6 }} /> },
     { key: 'assign-balance', label: 'Assign Balance', icon: <UserIcon style={{ marginRight: 6 }} /> },
   ];
+  const SUPERVISOR_TABS = [
+    { key: 'team-leaves',    label: 'Team Leaves', icon: <UsersIcon style={{ marginRight: 6 }} /> }
+  ];
   const EMP_TABS = [
     { key: 'apply',          label: 'Apply Leave', icon: <PlusIcon style={{ marginRight: 6 }} /> },
     { key: 'my-history',     label: 'My History', icon: <ClipboardCheckIcon style={{ marginRight: 6 }} /> },
     { key: 'my-balance',     label: 'My Balance', icon: <UserIcon style={{ marginRight: 6 }} /> },
   ];
-  const tabs = isAdmin ? [...ADMIN_TABS, ...EMP_TABS] : EMP_TABS;
+  const tabs = isAdmin 
+    ? [...ADMIN_TABS, ...EMP_TABS] 
+    : isSupervisor 
+      ? [...SUPERVISOR_TABS, ...EMP_TABS] 
+      : EMP_TABS;
 
   return (
     <div className="fade-in">
@@ -56,6 +77,7 @@ export default function Leaves() {
       {tab === 'pending'        && <PendingRequests toast={toast} />}
       {tab === 'all-requests'   && <AllRequests     toast={toast} />}
       {tab === 'assign-balance' && <AssignBalance   toast={toast} />}
+      {tab === 'team-leaves'    && <TeamLeaves      toast={toast} />}
       {tab === 'apply'          && <ApplyLeave    toast={toast} />}
       {tab === 'my-history'     && <MyHistory     toast={toast} />}
       {tab === 'my-balance'     && <MyBalance     toast={toast} />}
@@ -166,6 +188,37 @@ function MyHistory({ toast }) {
           <option value="Approved">Approved</option>
           <option value="Rejected">Rejected</option>
         </select>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (typeFilter) params.leave_type = typeFilter;
+            if (statusFilter) params.status = statusFilter;
+            params.append('employee_id', user.id);
+            
+            const token = sessionStorage.getItem('hr_token');
+            fetch(`/api/exports/leaves?${params.toString()}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => {
+              if (!res.ok) throw new Error('Export failed.');
+              return res.blob();
+            })
+            .then(blob => {
+              const blobUrl = window.URL.createObjectURL(blob);
+              const tempLink = document.createElement('a');
+              tempLink.href = blobUrl;
+              tempLink.setAttribute('download', `Leave_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+              document.body.appendChild(tempLink);
+              tempLink.click();
+              document.body.removeChild(tempLink);
+            })
+            .catch(() => toast.error('Failed to export leave report.'));
+          }}
+          style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          <DownloadIcon style={{ width: 14, height: 14 }} /> Export Report
+        </button>
       </div>
       <div className="card">
         {loading ? <Spinner /> : (
@@ -521,6 +574,116 @@ function AssignBalance({ toast }) {
             <p>Select an employee to view their balances</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function TeamLeaves({ toast }) {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (statusFilter && statusFilter !== 'all') params.status = statusFilter;
+      const { data } = await getTeamLeaves(params);
+      setRequests(data);
+    } catch {
+      toast.error('Failed to load team leaves.');
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div>
+      <div className="search-filter-row">
+        <select className="form-control filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="all">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (statusFilter && statusFilter !== 'all') params.status = statusFilter;
+            
+            const token = sessionStorage.getItem('hr_token');
+            fetch(`/api/exports/leaves?${params.toString()}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => {
+              if (!res.ok) throw new Error('Export failed.');
+              return res.blob();
+            })
+            .then(blob => {
+              const blobUrl = window.URL.createObjectURL(blob);
+              const tempLink = document.createElement('a');
+              tempLink.href = blobUrl;
+              tempLink.setAttribute('download', `Team_Leave_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+              document.body.appendChild(tempLink);
+              tempLink.click();
+              document.body.removeChild(tempLink);
+            })
+            .catch(() => toast.error('Failed to export leave report.'));
+          }}
+          style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          <DownloadIcon style={{ width: 14, height: 14 }} /> Export Report
+        </button>
+      </div>
+      <div className="card">
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Employee Name</th>
+                <th>Type</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Days</th>
+                <th>Reason</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.length === 0 && (
+                <tr>
+                  <td colSpan={7}>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <InboxIcon style={{ width: 48, height: 48 }} />
+                      </div>
+                      <h3>No team leaves found</h3>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {requests.map((l) => (
+                <tr key={l.id}>
+                  <td style={{ fontWeight: 600 }}>{l.employee_name}</td>
+                  <td><Badge status={l.leave_type} /></td>
+                  <td className="td-muted">{l.start_date}</td>
+                  <td className="td-muted">{l.end_date}</td>
+                  <td>{l.days_requested}</td>
+                  <td className="td-muted" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.reason || '—'}</td>
+                  <td><Badge status={l.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { getActiveAnnouncements } from '../../services/api';
 import { MegaphoneIcon } from './Icons';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function AnnouncementWidget() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  console.log("[AnnouncementWidget] Rendering. announcements count:", announcements.length);
 
   useEffect(() => {
     (async () => {
@@ -28,7 +31,7 @@ export default function AnnouncementWidget() {
         <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
           <MegaphoneIcon style={{ width: 16, height: 16, color: 'var(--accent)' }} /> Active Announcements
         </div>
-        <Link to="/announcements" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>
+        <Link to="/notifications" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>
           View All &rarr;
         </Link>
       </div>
@@ -40,7 +43,12 @@ export default function AnnouncementWidget() {
               padding: '12px 16px', 
               borderRadius: 8, 
               background: 'var(--bg-elevated)', 
-              borderLeft: '4px solid var(--accent)' 
+              borderLeft: '4px solid var(--accent)',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              console.log("[AnnouncementWidget] Card clicked, navigating to notifications page. ID:", ann.id);
+              navigate('/notifications', { state: { openAnnouncementId: ann.id } });
             }}
           >
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>

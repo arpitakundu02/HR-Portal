@@ -206,10 +206,10 @@ export default function Header() {
 
         {/* Role badge */}
         <span
-          className={`badge ${user?.role === 'Admin' ? 'badge-admin' : 'badge-employee'}`}
+          className={`badge ${user?.role === 'Admin' ? 'badge-admin' : user?.is_line_manager ? 'badge-in-progress' : 'badge-employee'}`}
           style={{ padding: '6px 14px' }}
         >
-          {user?.role}
+          {user?.is_line_manager ? 'Line Manager' : user?.role}
         </span>
 
         {/* Profile shortcut */}
@@ -219,11 +219,16 @@ export default function Header() {
           title="My Profile"
           style={{
             width: 38, height: 38, borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--accent), #8b5cf6)',
+            background: user?.photo_url ? 'none' : 'linear-gradient(135deg, var(--accent), #8b5cf6)',
             color: 'white', fontWeight: 700, fontSize: 14, border: 'none',
+            padding: 0, overflow: 'hidden'
           }}
         >
-          {initials}
+          {user?.photo_url ? (
+            <img src={user.photo_url} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            initials
+          )}
         </button>
       </div>
     </header>

@@ -8,8 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
 import { useToast } from '../components/common/Toast';
-import { getMe, updateEmployee, uploadResume } from '../services/api';
-import { EditIcon, DownloadIcon, UploadIcon, SaveIcon, LockIcon, EyeIcon, EyeOffIcon } from '../components/common/Icons';
+import { getMe, updateEmployee, uploadResume, uploadPhoto, deletePhoto } from '../services/api';
+import { EditIcon, DownloadIcon, UploadIcon, SaveIcon, LockIcon, EyeIcon, EyeOffIcon, CameraIcon, TrashIcon } from '../components/common/Icons';
 
 export default function Profile() {
   const { user, updateUser, isAdmin } = useAuth();
@@ -19,10 +19,11 @@ export default function Profile() {
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Editable fields
   const [form, setForm] = useState({
-    address: '', current_address: '', permanent_address: '', emergency_contact: '',
+    address: '', current_address: '', permanent_address: '', emergency_contact: '', phone_number: '', bio: '', experience_summary: '', gender: '',
   });
 
   const [uploadingResume, setUploadingResume] = useState(false);
@@ -35,8 +36,12 @@ export default function Profile() {
     fd.append('resume', file);
     setUploadingResume(true);
     try {
-      await uploadResume(profile.id, fd);
-      toast.success('Resume uploaded successfully.');
+      const res = await uploadResume(profile.id, fd);
+      if (res.data.status === 'Pending') {
+        toast.info('Resume update submitted for approval.');
+      } else {
+        toast.success('Resume uploaded successfully.');
+      }
       const { data } = await getMe();
       setProfile(data);
       updateUser({ ...user, ...data });
@@ -44,6 +49,39 @@ export default function Profile() {
       toast.error(err.response?.data?.error || 'Upload failed.');
     } finally {
       setUploadingResume(false);
+    }
+  };
+
+  const handlePhotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fd = new FormData();
+    fd.append('photo', file);
+    setUploadingPhoto(true);
+    try {
+      const uploadRes = await uploadPhoto(profile.id, fd);
+      toast.success('Profile photo updated successfully.');
+      const { data } = await getMe();
+      setProfile(data);
+      updateUser({ ...user, ...data, photo_url: uploadRes.data.photo_url });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Photo upload failed.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    if (!window.confirm("Are you sure you want to delete your profile photo?")) return;
+    try {
+      await deletePhoto(profile.id);
+      toast.success('Profile photo deleted.');
+      const { data } = await getMe();
+      setProfile(data);
+      updateUser({ ...user, ...data, photo_url: null });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Delete photo failed.');
     }
   };
 
@@ -64,6 +102,10 @@ export default function Profile() {
           current_address:   data.current_address   || '',
           permanent_address: data.permanent_address || '',
           emergency_contact: data.emergency_contact || '',
+          phone_number:      data.phone_number      || '',
+          bio:               data.bio               || '',
+          experience_summary:data.experience_summary|| '',
+          gender:            data.gender            || 'Male',
         });
       } catch { toast.error('Failed to load profile.'); }
       finally { setLoading(false); }
@@ -121,13 +163,54 @@ export default function Profile() {
   return (
     <div className="fade-in">
       {/* Profile Header */}
-      <div className="profile-header">
-        <div className="profile-avatar">{initials}</div>
+      <div className="profile-header" style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '24px 30px' }}>
+        <div style={{ position: 'relative' }}>
+          {profile.photo_url ? (
+            <img
+              src={profile.photo_url}
+              alt={profile.name}
+              style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border)' }}
+            />
+          ) : (
+            <div style={{ width: 80, height: 80, borderRadius: '50%', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 700, border: '3px solid var(--border)' }}>
+              {initials}
+            </div>
+          )}
+          {profile.photo_url && (
+            <button
+              onClick={handleDeletePhoto}
+              title="Delete photo"
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                backgroundColor: '#ef4444',
+                color: '#fff',
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                padding: 0
+              }}
+            >
+              <TrashIcon style={{ width: 12, height: 12 }} />
+            </button>
+          )}
+          <label style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: 'var(--accent)', color: '#fff', width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.2)', margin: 0 }}>
+            {uploadingPhoto ? '...' : <CameraIcon style={{ width: 12, height: 12 }} />}
+            <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} disabled={uploadingPhoto} />
+          </label>
+        </div>
         <div className="profile-meta">
           <h2>{profile.name}</h2>
-          <p>{profile.rank || profile.role} · {profile.department_name || 'No Department'}</p>
+          <p>{profile.rank || (profile.is_line_manager ? 'Line Manager' : profile.role)} · {profile.department_name || 'No Department'}</p>
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <Badge status={profile.role} />
+            <Badge status={profile.is_line_manager ? 'Line Manager' : profile.role} />
             <Badge status={profile.is_active ? 'Active' : 'Inactive'} />
             <span className="badge badge-apl">{profile.employee_id}</span>
           </div>
@@ -151,7 +234,9 @@ export default function Profile() {
             <InfoRow label="Date of Birth"  value={profile.dob} />
             <InfoRow label="Blood Group"    value={profile.blood_group} />
             <InfoRow label="Email"          value={profile.email} />
+            <InfoRow label="Phone Number"   value={profile.phone_number} />
             <InfoRow label="Emergency Contact" value={profile.emergency_contact} />
+            <InfoRow label="Gender"          value={profile.gender} />
           </div>
         </div>
 
@@ -175,7 +260,7 @@ export default function Profile() {
                   📄 Resume: {profile.resume_url.split('/').pop().replace(/^resume_\d+_/, '')}
                 </p>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <a href={profile.resume_url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                  <a href={`${profile.resume_url}?auth_token=${sessionStorage.getItem('hr_token')}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
                     <DownloadIcon style={{ marginRight: 6 }} /> Download Resume
                   </a>
                   <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer', display: 'inline-block', margin: 0 }}>
@@ -207,17 +292,25 @@ export default function Profile() {
                 { key: 'address',           label: 'Address' },
                 { key: 'permanent_address', label: 'Permanent Address' },
                 { key: 'current_address',   label: 'Current Address' },
+                { key: 'phone_number',      label: 'Phone Number' },
                 { key: 'emergency_contact', label: 'Emergency Contact' },
               ].map(({ key, label }) => (
                 <div key={key} className="form-group">
                   <label className="form-label">{label}</label>
-                  {key === 'emergency_contact' ? (
+                  {key === 'emergency_contact' || key === 'phone_number' ? (
                     <input className="form-control" value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} />
                   ) : (
                     <textarea className="form-control" rows={2} value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} />
                   )}
                 </div>
               ))}
+              <div className="form-group">
+                <label className="form-label">Gender <span className="form-required">*</span></label>
+                <select className="form-control" name="gender" value={form.gender} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))} required>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
                 <button className="btn btn-secondary" onClick={() => setEditMode(false)} disabled={saving}>Cancel</button>
                 <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
@@ -230,6 +323,7 @@ export default function Profile() {
               <InfoRow label="Address"           value={profile.address} />
               <InfoRow label="Current Address"   value={profile.current_address} />
               <InfoRow label="Permanent Address" value={profile.permanent_address} />
+              <InfoRow label="Phone Number"      value={profile.phone_number} />
               <InfoRow label="Emergency Contact" value={profile.emergency_contact} />
             </div>
           )}
@@ -287,6 +381,58 @@ export default function Profile() {
             <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
               Keep your account secure by using a strong, unique password.
             </p>
+          )}
+        </div>
+
+        {/* Professional Profile Card */}
+        <div className="card" style={{ gridColumn: 'span 2' }}>
+          <div className="card-header">
+            <div className="card-title">💼 Professional Profile</div>
+          </div>
+          {editMode ? (
+            <div>
+              <div className="form-group">
+                <label className="form-label">Bio / About Me</label>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  value={form.bio}
+                  placeholder="Tell us about yourself..."
+                  onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                />
+                <small className="form-text text-muted" style={{ display: 'block', marginTop: 4 }}>
+                  Recommendation: A bio of 50+ words is suggested for a complete profile. Current word count: {form.bio ? form.bio.trim().split(/\s+/).filter(Boolean).length : 0}
+                </small>
+              </div>
+              <div className="form-group" style={{ marginTop: 16 }}>
+                <label className="form-label">Experience Summary</label>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  value={form.experience_summary}
+                  placeholder="Summarize your professional experience..."
+                  onChange={(e) => setForm((f) => ({ ...f, experience_summary: e.target.value }))}
+                />
+                <small className="form-text text-muted" style={{ display: 'block', marginTop: 4 }}>
+                  Maximum 5000 characters. Current length: {form.experience_summary ? form.experience_summary.length : 0} / 5000
+                </small>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 4px' }}>
+              <div>
+                <strong style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Bio / About Me</strong>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
+                  {profile.bio || 'No bio submitted yet.'}
+                </p>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                <strong style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Experience Summary</strong>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
+                  {profile.experience_summary || 'No experience summary submitted yet.'}
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </div>

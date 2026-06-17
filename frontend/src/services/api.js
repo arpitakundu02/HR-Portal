@@ -40,6 +40,7 @@ api.interceptors.response.use(
    ================================================================ */
 export const loginUser  = (data)   => api.post('/auth/login', data);
 export const getMe      = ()       => api.get('/auth/me');
+export const getBadgeCounts = ()   => api.get('/auth/badge-counts');
 
 /* ================================================================
    EMPLOYEES
@@ -55,6 +56,14 @@ export const uploadResume = (id, formData) =>
   api.post(`/employees/${id}/resume`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+
+export const uploadPhoto = (id, formData) =>
+  api.post(`/employees/${id}/photo`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+export const getEmployeeDashboardDetails = (id) => api.get(`/employees/${id}/dashboard-details`);
+export const deletePhoto = (id) => api.delete(`/employees/${id}/photo`);
 
 /* ================================================================
    DEPARTMENTS
@@ -142,6 +151,63 @@ export const deleteAnnouncement     = (id)     => api.delete(`/announcements/${i
    ================================================================ */
 export const getWorkTransfers       = ()       => api.get('/work-transfers/');
 export const createWorkTransfer     = (data)   => api.post('/work-transfers/', data);
+
+/* ================================================================
+   REGISTRATIONS
+   ================================================================ */
+export const registerEmployee           = (data)   => api.post('/registrations/register', data);
+export const getRegistrationRequests    = ()       => api.get('/registrations/requests');
+export const actionRegistrationRequest  = (id, data) => api.post(`/registrations/requests/${id}/action`, data);
+
+/* ================================================================
+   COMP-OFF
+   ================================================================ */
+export const applyCompOff         = (data)   => api.post('/comp-off/request', data);
+export const getCompOffHistory    = ()       => api.get('/comp-off/history');
+export const getCompOffBalance    = ()       => api.get('/comp-off/balance');
+export const getAdminCompOffAll   = ()       => api.get('/comp-off/admin/all');
+
+/* ================================================================
+   APPROVALS (CENTRALIZED)
+   ================================================================ */
+export const getPendingApprovals  = ()       => api.get('/approvals/pending');
+export const actionApproval       = (id, data) => api.post(`/approvals/${id}/action`, data);
+
+/* ================================================================
+   TIMESHEETS
+   ================================================================ */
+export const submitTimesheet    = (data)   => api.post('/timesheets', data);
+export const getTimesheetHistory = ()       => api.get('/timesheets');
+export const getTeamTimesheets   = (params) => api.get('/timesheets/team', { params });
+
+/* ================================================================
+   TEAM DASHBOARD
+   ================================================================ */
+export const getTeamDashboardMetadata = () => api.get('/team-dashboard/metadata');
+export const getTeamDashboardStats    = () => api.get('/team-dashboard/stats');
+
+/* ================================================================
+   ORGANIZATION HIERARCHY
+   ================================================================ */
+export const getHierarchy = () => api.get('/hierarchy');
+
+export const getTeamLeaves      = (params) => api.get('/leaves/team', { params });
+export const getTeamAttendance  = (params) => api.get('/attendance/team', { params });
+export const getDirectory       = (params) => api.get('/employees/directory', { params });
+
+/* ================================================================
+   POLICIES & HANDBOOK
+   ================================================================ */
+export const getPolicies = () => api.get('/policies/');
+export const getPoliciesStats = () => api.get('/policies/stats');
+export const getPolicyHistory = (groupId) => api.get(`/policies/${groupId}/history`);
+export const createPolicy = (formData) => api.post('/policies/', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const updatePolicy = (id, formData) => api.put(`/policies/${id}`, formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const deletePolicy = (id) => api.delete(`/policies/${id}`);
 
 export default api;
 

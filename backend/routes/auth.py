@@ -20,11 +20,7 @@ from utils.decorators import jwt_required
 auth_bp = Blueprint("auth", __name__)
 
 
-def _auto_employee_id() -> str:
-    """Generate next sequential employee ID like HR-001."""
-    last = User.query.order_by(User.id.desc()).first()
-    next_num = (last.id + 1) if last else 1
-    return f"HR-{next_num:03d}"
+# Unused _auto_employee_id helper removed
 
 
 
@@ -112,6 +108,149 @@ def get_current_user(current_user_id, current_user_role):
         return jsonify({"error": "User not found."}), 404
 
     return jsonify(user.to_dict(include_sensitive=True)), 200
+
+
+# ------------------------------------------------------------------
+# GET /api/auth/badge-counts
+# ------------------------------------------------------------------
+@auth_bp.route("/badge-counts", methods=["GET"])
+@jwt_required
+def get_badge_counts(current_user_id, current_user_role):
+    """
+    Returns unread counts/actionable items for the logged-in user:
+    - Approvals: Pending approval requests assigned/delegated to the user
+    - Leaves: Pending leave requests (Admin: all company; LM: direct reports; Employee: 0)
+    - Tasks: Pending or In Progress tasks assigned to the user
+    - Meetings: Upcoming meetings (scheduled_at >= now) visible to the user
+    - Timesheets: Submitted timesheets (Admin: all team; LM: direct reports; Employee: 0)
+    - Registrations: Pending registration requests (Admin only)
+    """
+    from datetime import date, datetime
+    from models import ApprovalRequest, WorkTransferRequest, Leave, Task, Meeting, Timesheet, RegistrationRequest
+    today = date.today()
+    now = datetime.utcnow()
+
+    # 1. Approvals
+    delegated_users = db.session.query(WorkTransferRequest.requester_id).filter(
+        WorkTransferRequest.delegate_to_id == current_user_id,
+        WorkTransferRequest.status == "Approved",
+        WorkTransferRequest.start_date <= today,
+        WorkTransferRequest.end_date >= today,
+        WorkTransferRequest.transfer_approvals == True
+    ).all()
+    delegator_ids = [r[0] for r in delegated_users]
+    
+    app_query = ApprovalRequest.query.filter(ApprovalRequest.status == "Pending")
+    if current_user_role == "Admin":
+        conditions = [
+            ApprovalRequest.approver_id == current_user_id,
+            ApprovalRequest.module_type == "ResumeUpdate"
+        ]
+        if delegator_ids:
+            conditions.append(ApprovalRequest.approver_id.in_(delegator_ids))
+        app_query = app_query.filter(db.or_(*conditions))
+    else:
+        if delegator_ids:
+            app_query = app_query.filter(
+                db.or_(
+                    ApprovalRequest.approver_id == current_user_id,
+                    ApprovalRequest.approver_id.in_(delegator_ids)
+                )
+            )
+        else:
+            app_query = app_query.filter(ApprovalRequest.approver_id == current_user_id)
+    approvals_count = app_query.count()
+
+    # 2. Leaves (Pending only)
+    if current_user_role == "Admin":
+        leaves_count = Leave.query.filter_by(status="Pending").count()
+    elif getattr(User.query.get(current_user_id), 'is_line_manager', False):
+        reports = User.query.filter_by(manager_id=current_user_id, is_active=True).all()
+        report_ids = [r.id for r in reports]
+        if report_ids:
+            leaves_count = Leave.query.filter(Leave.employee_id.in_(report_ids), Leave.status == "Pending").count()
+        else:
+            leaves_count = 0
+    else:
+        leaves_count = 0
+
+    # 3. Tasks (Pending or In Progress assigned to user or delegated to user)
+    delegated_tasks_users = db.session.query(WorkTransferRequest.requester_id).filter(
+        WorkTransferRequest.delegate_to_id == current_user_id,
+        WorkTransferRequest.status == "Approved",
+        WorkTransferRequest.start_date <= today,
+        WorkTransferRequest.end_date >= today,
+        WorkTransferRequest.transfer_tasks == True
+    ).all()
+    delegator_task_ids = [r[0] for r in delegated_tasks_users]
+
+    task_query = Task.query.filter(Task.status.in_(["Pending", "In Progress"]))
+    if delegator_task_ids:
+        task_query = task_query.filter(
+            db.or_(
+                Task.employee_id == current_user_id,
+                Task.employee_id.in_(delegator_task_ids)
+            )
+        )
+    else:
+        task_query = task_query.filter(Task.employee_id == current_user_id)
+    tasks_count = task_query.count()
+
+    # 4. Meetings (Upcoming only, scheduled_at >= now)
+    if current_user_role == "Admin":
+        meetings_count = Meeting.query.filter(Meeting.scheduled_at >= now).count()
+    else:
+        user_obj = User.query.get(current_user_id)
+        dept_id = user_obj.department_id if user_obj else None
+
+        delegated_meetings_users = db.session.query(WorkTransferRequest.requester_id).filter(
+            WorkTransferRequest.delegate_to_id == current_user_id,
+            WorkTransferRequest.status == "Approved",
+            WorkTransferRequest.start_date <= today,
+            WorkTransferRequest.end_date >= today,
+            WorkTransferRequest.transfer_meetings == True
+        ).all()
+        delegator_meeting_ids = [r[0] for r in delegated_meetings_users]
+        delegator_dept_ids = [u.department_id for u in User.query.filter(User.id.in_(delegator_meeting_ids)).all() if u.department_id] if delegator_meeting_ids else []
+
+        conditions = [Meeting.department_id == None]
+        if dept_id:
+            conditions.append(Meeting.department_id == dept_id)
+        for d_id in delegator_dept_ids:
+            conditions.append(Meeting.department_id == d_id)
+
+        meetings_count = Meeting.query.filter(
+            Meeting.scheduled_at >= now,
+            db.or_(*conditions)
+        ).count()
+
+    # 5. Timesheets (Pending/Submitted count for supervisor review, else 0)
+    if current_user_role == "Admin":
+        timesheets_count = Timesheet.query.filter_by(status="Submitted").count()
+    elif getattr(User.query.get(current_user_id), 'is_line_manager', False):
+        reports = User.query.filter_by(manager_id=current_user_id, is_active=True).all()
+        report_ids = [r.id for r in reports]
+        if report_ids:
+            timesheets_count = Timesheet.query.filter(Timesheet.employee_id.in_(report_ids), Timesheet.status == "Submitted").count()
+        else:
+            timesheets_count = 0
+    else:
+        timesheets_count = 0
+
+    # 6. Registrations (Pending only, Admin-only)
+    if current_user_role == "Admin":
+        registrations_count = RegistrationRequest.query.filter_by(status="Pending").count()
+    else:
+        registrations_count = 0
+
+    return jsonify({
+        "approvals": approvals_count,
+        "leaves": leaves_count,
+        "tasks": tasks_count,
+        "meetings": meetings_count,
+        "timesheets": timesheets_count,
+        "registrations": registrations_count
+    }), 200
 
 
 

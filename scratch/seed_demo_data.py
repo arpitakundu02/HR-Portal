@@ -73,7 +73,8 @@ def seed():
                 department_id=dept.id,
                 date_of_joining=date(2022, 1, 15) + timedelta(days=i*10),
                 rank="Senior Associate" if i % 3 == 0 else "Associate",
-                is_active=True
+                is_active=True,
+                gender="Female" if name in ("Simran Kaur", "Neha Gupta", "Ananya Sen", "Diya Mehta") else "Male"
             )
             db.session.add(user)
             users.append(user)
@@ -107,12 +108,13 @@ def seed():
             for ltype in ["APL", "WFH"]:
                 bal = LeaveBalance.query.filter_by(employee_id=user.id, leave_type=ltype).first()
                 if not bal:
+                    allocated_val = 20 if ltype == "APL" else (5 if user.gender == "Female" else 4)
                     bal = LeaveBalance(
                         employee_id=user.id,
                         leave_type=ltype,
-                        allocated=20 if ltype == "APL" else 15,
+                        allocated=allocated_val,
                         used=0,
-                        remaining=20 if ltype == "APL" else 15
+                        remaining=allocated_val
                     )
                     db.session.add(bal)
         db.session.commit()

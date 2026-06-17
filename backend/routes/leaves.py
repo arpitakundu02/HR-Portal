@@ -12,7 +12,8 @@ Endpoints:
   POST /api/leaves/requests/<id>/action  - Admin: Approve or Reject a leave request
 """
 
-from datetime import datetime
+from datetime import datetime, date
+import calendar
 from flask import Blueprint, request, jsonify, current_app
 from models import Leave, LeaveBalance, User
 from extensions import db
@@ -20,6 +21,31 @@ from utils.decorators import jwt_required, admin_required
 from utils.email_service import send_leave_notification
 
 leaves_bp = Blueprint("leaves", __name__)
+
+def get_approved_apl_days_in_year(employee_id, year):
+    first_day = date(year, 1, 1)
+    last_day = date(year, 12, 31)
+    approved_leaves = Leave.query.filter(
+        Leave.employee_id == employee_id,
+        Leave.leave_type == "APL",
+        Leave.status == "Approved",
+        Leave.start_date >= first_day,
+        Leave.start_date <= last_day
+    ).all()
+    return sum(l.days_requested for l in approved_leaves)
+
+def get_approved_wfh_days_in_month(employee_id, year, month):
+    first_day = date(year, month, 1)
+    last_day_num = calendar.monthrange(year, month)[1]
+    last_day = date(year, month, last_day_num)
+    approved_leaves = Leave.query.filter(
+        Leave.employee_id == employee_id,
+        Leave.leave_type == "WFH",
+        Leave.status == "Approved",
+        Leave.start_date >= first_day,
+        Leave.start_date <= last_day
+    ).all()
+    return sum(l.days_requested for l in approved_leaves)
 
 
 # ------------------------------------------------------------------
@@ -134,6 +160,8 @@ def apply_leave(current_user_id, current_user_role):
 
     if end < start:
         return jsonify({"error": "end_date must be on or after start_date."}), 422
+
+
 
     resp_transfer_id = data.get("responsibility_transfer_id")
     if not resp_transfer_id:
@@ -315,6 +343,8 @@ def action_leave(leave_id, current_user_id, current_user_role):
     if leave.status != "Pending":
         return jsonify({"error": f"This request is already {leave.status}."}), 409
 
+
+
     leave.status = data["status"]
     leave.actioned_by = current_user_id
     leave.actioned_at = datetime.utcnow()
@@ -371,3 +401,27 @@ def action_leave(leave_id, current_user_id, current_user_role):
             pass
 
     return jsonify(leave.to_dict()), 200
+
+
+# ------------------------------------------------------------------
+# GET /api/leaves/team  (Supervisor direct reports leaves)
+# ------------------------------------------------------------------
+@leaves_bp.route("/team", methods=["GET"])
+@jwt_required
+def get_team_leaves(current_user_id, current_user_role):
+    """
+    Supervisor view of leaves of their direct reports.
+    """
+    reports = User.query.filter_by(manager_id=current_user_id, is_active=True).all()
+    if not reports:
+        return jsonify([]), 200
+    report_ids = [r.id for r in reports]
+    
+    status = request.args.get("status")
+    query = Leave.query.filter(Leave.employee_id.in_(report_ids))
+    if status and status != "all":
+        query = query.filter_by(status=status)
+        
+    leaves = query.order_by(Leave.created_at.desc()).all()
+    return jsonify([l.to_dict() for l in leaves]), 200
+

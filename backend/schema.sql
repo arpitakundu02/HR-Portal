@@ -46,10 +46,19 @@ CREATE TABLE IF NOT EXISTS users (
     rank                VARCHAR(50),
     aadhar_number       VARCHAR(20),
     resume_url          VARCHAR(255),
+    photo_url           VARCHAR(255),
+    phone_number        VARCHAR(20),
+    manager_id          INT,
+    is_line_manager     BOOLEAN NOT NULL DEFAULT FALSE,
+    bio                 TEXT,
+    experience_summary  TEXT,
+    gender              VARCHAR(20) DEFAULT 'Male',
     is_active           BOOLEAN NOT NULL DEFAULT TRUE,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_dept FOREIGN KEY (department_id)
-        REFERENCES departments(id) ON DELETE SET NULL
+        REFERENCES departments(id) ON DELETE SET NULL,
+    CONSTRAINT fk_user_manager FOREIGN KEY (manager_id)
+        REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================

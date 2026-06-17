@@ -5,14 +5,21 @@ backend/routes/announcements.py
 Endpoints for managing company announcements.
 """
 
+import os
 from datetime import datetime
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
+from werkzeug.utils import secure_filename
 from extensions import db
 from models import Announcement, User, Department
 from utils.decorators import jwt_required, admin_required
 from utils.notification_service import create_notification
 
 announcements_bp = Blueprint("announcements", __name__)
+
+ALLOWED_EXTENSIONS = {"pdf", "docx"}
+
+def _allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def is_user_manager(user):
     """Check if a user is a manager (manages at least one user or department)."""
@@ -84,23 +91,62 @@ def get_active_announcements(current_user_id, current_user_role):
 def create_announcement(current_user_id, current_user_role):
     """
     Admin-only: Create a new announcement and notify targeted users.
+    Supports both JSON and Multipart Form Data (for attachments).
     """
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    content = data.get("content", "").strip()
+    if request.is_json:
+        data = request.get_json() or {}
+        title = data.get("title", "").strip()
+        content = data.get("content", "").strip()
+        audience_type = data.get("audience_type", "All")
+        department_id = data.get("department_id")
+        expires_at_str = data.get("expires_at")
+        is_active_val = data.get("is_active", True)
+        if isinstance(is_active_val, str):
+            is_active = is_active_val.lower() == "true"
+        else:
+            is_active = bool(is_active_val)
+        attachment_url = None
+    else:
+        title = request.form.get("title", "").strip()
+        content = request.form.get("content", "").strip()
+        audience_type = request.form.get("audience_type", "All")
+        department_id = request.form.get("department_id")
+        if department_id is None or department_id == "null" or department_id == "":
+            department_id = None
+        else:
+            try:
+                department_id = int(department_id)
+            except ValueError:
+                department_id = None
+        expires_at_str = request.form.get("expires_at")
+        is_active_val = request.form.get("is_active", "true")
+        if isinstance(is_active_val, str):
+            is_active = is_active_val.lower() == "true"
+        else:
+            is_active = bool(is_active_val)
+        
+        attachment_url = None
+        if "attachment" in request.files:
+            file = request.files["attachment"]
+            if file.filename != "":
+                if not _allowed_file(file.filename):
+                    return jsonify({"error": "Only PDF and DOCX files are allowed for announcements."}), 422
+                
+                filename = secure_filename(f"ann_{int(datetime.utcnow().timestamp())}_{file.filename}")
+                upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], "announcements")
+                os.makedirs(upload_path, exist_ok=True)
+                file.save(os.path.join(upload_path, filename))
+                attachment_url = f"/api/announcements/uploads/{filename}"
     
     if not title or not content:
         return jsonify({"error": "title and content are required."}), 422
         
-    audience_type = data.get("audience_type", "All")
     if audience_type not in ("All", "Department", "Employees", "Managers"):
         return jsonify({"error": "Invalid audience_type."}), 422
         
-    department_id = data.get("department_id")
     if audience_type == "Department" and not department_id:
         return jsonify({"error": "department_id is required when audience_type is 'Department'."}), 422
         
-    expires_at_str = data.get("expires_at")
     expires_at = None
     if expires_at_str:
         try:
@@ -116,7 +162,8 @@ def create_announcement(current_user_id, current_user_role):
             department_id=department_id,
             created_by=current_user_id,
             expires_at=expires_at,
-            is_active=data.get("is_active", True)
+            is_active=is_active,
+            attachment_url=attachment_url
         )
         db.session.add(announcement)
         db.session.commit()
@@ -159,32 +206,81 @@ def create_announcement(current_user_id, current_user_role):
 def update_announcement(announcement_id, current_user_id, current_user_role):
     """
     Admin-only: Update an announcement.
+    Supports both JSON and Multipart Form Data (for attachments).
     """
     announcement = Announcement.query.get_or_404(announcement_id)
-    data = request.get_json(silent=True) or {}
     
-    if "title" in data:
-        announcement.title = data["title"].strip()
-    if "content" in data:
-        announcement.content = data["content"].strip()
-    if "audience_type" in data:
-        aud = data["audience_type"]
-        if aud not in ("All", "Department", "Employees", "Managers"):
-            return jsonify({"error": "Invalid audience_type."}), 422
-        announcement.audience_type = aud
-    if "department_id" in data:
-        announcement.department_id = data["department_id"]
-    if "expires_at" in data:
-        exp_str = data["expires_at"]
-        if exp_str:
+    if request.is_json:
+        data = request.get_json() or {}
+        title = data.get("title")
+        content = data.get("content")
+        audience_type = data.get("audience_type")
+        department_id = data.get("department_id")
+        expires_at_str = data.get("expires_at")
+        is_active_val = data.get("is_active")
+        if is_active_val is not None:
+            if isinstance(is_active_val, str):
+                is_active = is_active_val.lower() == "true"
+            else:
+                is_active = bool(is_active_val)
+        else:
+            is_active = None
+        new_file = False
+    else:
+        title = request.form.get("title")
+        content = request.form.get("content")
+        audience_type = request.form.get("audience_type")
+        department_id = request.form.get("department_id")
+        if department_id == "null" or department_id == "":
+            department_id = None
+        elif department_id is not None:
             try:
-                announcement.expires_at = datetime.fromisoformat(exp_str.replace("Z", ""))
+                department_id = int(department_id)
+            except ValueError:
+                pass
+        expires_at_str = request.form.get("expires_at")
+        is_active_val = request.form.get("is_active")
+        if is_active_val is not None:
+            if isinstance(is_active_val, str):
+                is_active = is_active_val.lower() == "true"
+            else:
+                is_active = bool(is_active_val)
+        else:
+            is_active = None
+        
+        new_file = "attachment" in request.files
+        if new_file:
+            file = request.files["attachment"]
+            if file.filename != "":
+                if not _allowed_file(file.filename):
+                    return jsonify({"error": "Only PDF and DOCX files are allowed for announcements."}), 422
+                
+                filename = secure_filename(f"ann_{int(datetime.utcnow().timestamp())}_{file.filename}")
+                upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], "announcements")
+                os.makedirs(upload_path, exist_ok=True)
+                file.save(os.path.join(upload_path, filename))
+                announcement.attachment_url = f"/api/announcements/uploads/{filename}"
+
+    if title is not None:
+        announcement.title = title.strip()
+    if content is not None:
+        announcement.content = content.strip()
+    if audience_type is not None:
+        if audience_type not in ("All", "Department", "Employees", "Managers"):
+            return jsonify({"error": "Invalid audience_type."}), 422
+        announcement.audience_type = audience_type
+    if department_id is not None or (not request.is_json and request.form.get("department_id") == ""):
+        announcement.department_id = department_id
+    if expires_at_str is not None:
+        if expires_at_str:
+            try:
+                announcement.expires_at = datetime.fromisoformat(expires_at_str.replace("Z", ""))
             except ValueError:
                 return jsonify({"error": "Invalid expires_at format."}), 422
         else:
             announcement.expires_at = None
-    if "is_active" in data:
-        announcement.is_active = data["is_active"]
+    if is_active is not None:
+        announcement.is_active = is_active
         
     db.session.commit()
     return jsonify(announcement.to_dict()), 200
@@ -199,3 +295,13 @@ def delete_announcement(announcement_id, current_user_id, current_user_role):
     db.session.delete(announcement)
     db.session.commit()
     return jsonify({"message": "Announcement deleted successfully."}), 200
+
+# ------------------------------------------------------------------
+# GET /api/announcements/uploads/<path:filename>
+# ------------------------------------------------------------------
+@announcements_bp.route("/uploads/<path:filename>", methods=["GET"])
+def get_announcement_upload(filename):
+    """Public route: Retrieve uploaded announcement files."""
+    upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], "announcements")
+    return send_from_directory(upload_path, filename)
+

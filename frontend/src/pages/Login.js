@@ -3,7 +3,7 @@
  * Redesigned premium SaaS split-screen authentication and landing experience.
  */
 import { useState, useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { loginUser } from '../services/api';
@@ -298,6 +298,11 @@ export default function Login() {
               >
                 {loginLoading ? 'Authenticating…' : `Secure Login`}
               </button>
+              {selectedRole === 'Employee' && (
+                <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--text-secondary)' }}>
+                  New employee? <Link to="/register" style={{ color: 'var(--accent)', fontWeight: 600 }}>Request registration</Link>
+                </div>
+              )}
             </form>
 
           </div>

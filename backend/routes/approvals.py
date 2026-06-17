@@ -39,20 +39,29 @@ def get_pending_approvals(current_user_id, current_user_role):
     ).all()
     delegator_ids = [r[0] for r in delegated_users]
     
-    if delegator_ids:
-        query = ApprovalRequest.query.filter(
-            db.or_(
-                ApprovalRequest.approver_id == current_user_id,
-                db.and_(
-                    ApprovalRequest.approver_id.in_(delegator_ids),
-                    ApprovalRequest.status == "Pending"
+    if current_user_role == "Admin":
+        conditions = [
+            ApprovalRequest.approver_id == current_user_id,
+            ApprovalRequest.module_type == "ResumeUpdate"
+        ]
+        if delegator_ids:
+            conditions.append(ApprovalRequest.approver_id.in_(delegator_ids))
+        query = ApprovalRequest.query.filter(db.or_(*conditions))
+    else:
+        if delegator_ids:
+            query = ApprovalRequest.query.filter(
+                db.or_(
+                    ApprovalRequest.approver_id == current_user_id,
+                    db.and_(
+                        ApprovalRequest.approver_id.in_(delegator_ids),
+                        ApprovalRequest.status == "Pending"
+                    )
                 )
             )
-        )
-    else:
-        query = ApprovalRequest.query.filter(
-            ApprovalRequest.approver_id == current_user_id
-        )
+        else:
+            query = ApprovalRequest.query.filter(
+                ApprovalRequest.approver_id == current_user_id
+            )
     
     query = query.filter(ApprovalRequest.status == "Pending")
     
@@ -72,8 +81,8 @@ def action_approval(request_id, current_user_id, current_user_role):
     """
     req = ApprovalRequest.query.get_or_404(request_id)
     
-    # Restrict actions to the designated approver or active delegate
-    is_authorized = (req.approver_id == current_user_id)
+    # Restrict actions to the designated approver, active delegate, or Admin for ResumeUpdate
+    is_authorized = (req.approver_id == current_user_id) or (current_user_role == "Admin" and req.module_type == "ResumeUpdate")
     if not is_authorized:
         from datetime import date
         from models import WorkTransferRequest

@@ -9,7 +9,13 @@ SCRIPTS = [
     "scratch/e2e_work_transfers.py",
     "scratch/e2e_tasks.py",
     "scratch/e2e_meetings.py",
-    "scratch/e2e_announcements.py"
+    "scratch/e2e_announcements.py",
+    "scratch/e2e_self_registration.py",
+    "scratch/e2e_comp_off.py",
+    "scratch/e2e_timesheets.py",
+    "scratch/e2e_team_dashboard.py",
+    "scratch/e2e_hierarchy.py",
+    "scratch/e2e_line_manager.py"
 ]
 
 def run_all_tests():

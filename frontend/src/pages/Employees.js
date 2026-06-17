@@ -1,9 +1,5 @@
-/**
- * pages/Employees.js
- * Employee directory with search, department filter, and pagination.
- * Admin: Full CRUD + resume upload. Employee: Read-only directory.
- */
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/common/Modal';
 import Badge from '../components/common/Badge';
@@ -18,7 +14,10 @@ import {
 import { EditIcon, TrashIcon, PaperclipIcon, PlusIcon, UploadIcon, UsersIcon } from '../components/common/Icons';
 
 export default function Employees() {
-  const { isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const { isAdmin, user } = useAuth();
+  const isManager = user?.is_line_manager === true;
+  const canManage = isAdmin || isManager;
   const toast       = useToast();
 
   const [employees,    setEmployees]    = useState([]);
@@ -116,10 +115,10 @@ export default function Employees() {
     <div className="fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h2>{isAdmin ? 'Employee Directory' : 'Team Directory'}</h2>
-          <p>{total} {isAdmin ? 'employee' : 'team member'}{total !== 1 ? 's' : ''} found</p>
+          <h2>{canManage ? 'Employee Directory' : 'Team Directory'}</h2>
+          <p>{total} {canManage ? 'employee' : 'team member'}{total !== 1 ? 's' : ''} found</p>
         </div>
-        {isAdmin && (
+        {canManage && (
           <div className="page-header-actions">
             <button className="btn btn-primary" onClick={() => { setEditTarget(null); setShowForm(true); }}>
               <PlusIcon style={{ marginRight: 6 }} /> Add Employee
@@ -134,12 +133,12 @@ export default function Employees() {
           <span className="search-icon">🔍</span>
           <input
             className="form-control"
-            placeholder={isAdmin ? "Search by name, ID or email…" : "Search by name or email…"}
+            placeholder={canManage ? "Search by name, ID or email…" : "Search by name or email…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        {isAdmin && (
+        {canManage && (
           <select
             className="form-control filter-select"
             value={deptFilter}
@@ -158,11 +157,12 @@ export default function Employees() {
             <div className="table-wrapper">
               <table>
                 <thead>
-                  {isAdmin ? (
+                  {canManage ? (
                     <tr>
                       <th>ID</th>
                       <th>Name</th>
                       <th>Email</th>
+                      <th>Phone</th>
                       <th>Department</th>
                       <th>Rank</th>
                       <th>Role</th>
@@ -183,7 +183,7 @@ export default function Employees() {
                 <tbody>
                   {employees.length === 0 && (
                     <tr>
-                      <td colSpan={isAdmin ? 9 : 5}>
+                      <td colSpan={canManage ? 10 : 5}>
                         <div className="empty-state">
                           <div className="empty-state-icon">
                             <UsersIcon style={{ width: 48, height: 48 }} />
@@ -195,14 +195,31 @@ export default function Employees() {
                   )}
                   {employees.map((emp) => (
                     <tr key={emp.id}>
-                      {isAdmin ? (
+                      {canManage ? (
                         <>
                           <td className="td-muted">{emp.employee_id}</td>
-                          <td style={{ fontWeight: 600 }}>{emp.name}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {emp.photo_url ? (
+                                <img src={emp.photo_url} alt={emp.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                              ) : (
+                                <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12 }}>
+                                  {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <span
+                                style={{ fontWeight: 600, cursor: 'pointer', color: 'var(--accent)' }}
+                                onClick={() => navigate(`/employees/${emp.id}`)}
+                              >
+                                {emp.name}
+                              </span>
+                            </div>
+                          </td>
                           <td className="td-muted">{emp.email}</td>
+                          <td className="td-muted">{emp.phone_number || '—'}</td>
                           <td className="td-muted">{emp.department_name || '—'}</td>
                           <td className="td-muted">{emp.rank || '—'}</td>
-                          <td><Badge status={emp.role} /></td>
+                          <td><Badge status={emp.is_line_manager ? 'Line Manager' : emp.role} /></td>
                           <td className="td-muted">{emp.date_of_joining || '—'}</td>
                           <td><Badge status={emp.is_active ? 'Active' : 'Inactive'} /></td>
                           <td>
@@ -215,10 +232,24 @@ export default function Employees() {
                         </>
                       ) : (
                         <>
-                          <td style={{ fontWeight: 600 }}>{emp.name}</td>
-                          <td className="td-muted">{emp.rank || emp.role}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {emp.photo_url ? (
+                                <img src={emp.photo_url} alt={emp.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                              ) : (
+                                <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12 }}>
+                                  {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <span style={{ fontWeight: 600 }}>{emp.name}</span>
+                            </div>
+                          </td>
+                          <td className="td-muted">{emp.rank || (emp.is_line_manager ? 'Line Manager' : emp.role)}</td>
                           <td className="td-muted">{emp.department_name || '—'}</td>
-                          <td className="td-muted">{emp.email}</td>
+                          <td className="td-muted">
+                            <div>{emp.email}</div>
+                            {emp.phone_number && <div style={{ fontSize: '12px', marginTop: '2px' }}>{emp.phone_number}</div>}
+                          </td>
                           <td>
                             <Badge
                               status={

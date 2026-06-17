@@ -6,6 +6,8 @@
 import { useState, useEffect } from 'react';
 import { EyeIcon, EyeOffIcon } from '../common/Icons';
 
+import { useAuth } from '../../context/AuthContext';
+
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const EMPTY = {
@@ -13,9 +15,11 @@ const EMPTY = {
   dob: '', blood_group: '', department_id: '', rank: '', role: 'Employee',
   date_of_joining: '', salary: '', aadhar_number: '',
   address: '', permanent_address: '', current_address: '', emergency_contact: '',
+  is_line_manager: false, phone_number: '', gender: 'Male',
 };
 
 export default function EmployeeForm({ initialData, departments, onSubmit, onCancel, loading }) {
+  const { isAdmin } = useAuth();
   const isEdit = !!initialData;
   const [form, setForm] = useState(EMPTY);
   const [showPassword, setShowPassword] = useState(false);
@@ -30,6 +34,9 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
         date_of_joining: initialData.date_of_joining || '',
         salary: initialData.salary || '',
         department_id: initialData.department_id || '',
+        is_line_manager: !!initialData.is_line_manager,
+        phone_number: initialData.phone_number || '',
+        gender: initialData.gender || 'Male',
       });
     } else {
       setForm(EMPTY);
@@ -56,14 +63,36 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
           <input className="form-control" name="employee_id" value={form.employee_id}
             onChange={change} placeholder="Auto-generated if blank" />
         </div>
-        <div className="form-group">
-          <label className="form-label">Role <span className="form-required">*</span></label>
-          <select className="form-control" name="role" value={form.role} onChange={change} required>
-            <option value="Employee">Employee</option>
-            <option value="Admin">Admin</option>
-          </select>
-        </div>
+        {isAdmin ? (
+          <div className="form-group">
+            <label className="form-label">Role <span className="form-required">*</span></label>
+            <select className="form-control" name="role" value={form.role} onChange={change} required>
+              <option value="Employee">Employee</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+        ) : (
+          <div className="form-group">
+            <label className="form-label">Role</label>
+            <input className="form-control" name="role" value={form.role} readOnly disabled />
+          </div>
+        )}
       </div>
+
+      {isAdmin && (
+        <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+          <label className="form-label" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+            <input
+              type="checkbox"
+              name="is_line_manager"
+              checked={!!form.is_line_manager}
+              onChange={(e) => setForm(f => ({ ...f, is_line_manager: e.target.checked }))}
+              style={{ width: 18, height: 18, cursor: 'pointer' }}
+            />
+            <span>Designate as Line Manager</span>
+          </label>
+        </div>
+      )}
 
       <div className="form-row">
         <div className="form-group">
@@ -141,10 +170,19 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
         </div>
       </div>
 
-      {/* Documents */}
-      <div className="form-group">
-        <label className="form-label">Aadhar Number</label>
-        <input className="form-control" name="aadhar_number" value={form.aadhar_number} onChange={change} placeholder="12-digit Aadhar" />
+      {/* Documents & Gender */}
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Aadhar Number</label>
+          <input className="form-control" name="aadhar_number" value={form.aadhar_number} onChange={change} placeholder="12-digit Aadhar" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Gender <span className="form-required">*</span></label>
+          <select className="form-control" name="gender" value={form.gender} onChange={change} required>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
       </div>
 
       {/* Address */}
@@ -163,9 +201,15 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
         </div>
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Emergency Contact</label>
-        <input className="form-control" name="emergency_contact" value={form.emergency_contact} onChange={change} placeholder="+91 98765 43210" />
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Phone Number</label>
+          <input className="form-control" name="phone_number" value={form.phone_number} onChange={change} placeholder="+91 99999 88888" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Emergency Contact</label>
+          <input className="form-control" name="emergency_contact" value={form.emergency_contact} onChange={change} placeholder="+91 98765 43210" />
+        </div>
       </div>
 
       <div className="form-actions">

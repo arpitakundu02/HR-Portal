@@ -109,3 +109,83 @@ def handle_work_transfer(target_id, action, db_session):
         print(f"[ERROR] Failed to send work transfer action notifications: {e}")
         
     return True
+
+
+# ------------------------------------------------------------------
+# Handler for CompOff module
+# ------------------------------------------------------------------
+@ApprovalCallbackRegistry.register("CompOff")
+def handle_comp_off(target_id, action, db_session):
+    from models import CompOffRequest, User
+    from routes.comp_off import get_or_create_comp_off_balance
+    from utils.notification_service import create_notification
+    from datetime import datetime
+    
+    req = db_session.query(CompOffRequest).get(target_id)
+    if not req:
+        return False
+        
+    req.status = action
+    req.actioned_at = datetime.utcnow()
+    
+    # Link comments from ApprovalRequest to rejection_reason if rejected
+    if action == "Rejected" and req.approval_request:
+        req.rejection_reason = req.approval_request.comments or "No comments provided."
+        
+    if action == "Approved":
+        cob = get_or_create_comp_off_balance(req.employee_id, db_session=db_session)
+        cob.allocated += 1
+        cob.recalculate()
+        
+    # Notify employee
+    try:
+        user = db_session.query(User).get(req.employee_id)
+        rejection_suffix = f" Reason: {req.rejection_reason}" if (action == "Rejected" and req.rejection_reason) else ""
+        create_notification(
+            user_id=req.employee_id,
+            title=f"Comp-Off Request {action}",
+            content=f"Your Comp-Off request for date {req.date_worked} has been {action.lower()}.{rejection_suffix}",
+            notification_type="CompOff",
+            target_id=req.id,
+            action_url="/comp-off"
+        )
+    except Exception as e:
+        print(f"[ERROR] Failed to send Comp-Off action notification: {e}")
+        
+    return True
+
+
+# ------------------------------------------------------------------
+# Handler for ResumeUpdate module
+# ------------------------------------------------------------------
+@ApprovalCallbackRegistry.register("ResumeUpdate")
+def handle_resume_update(target_id, action, db_session):
+    from models import ResumeUpdateRequest, User
+    from utils.notification_service import create_notification
+    
+    update_req = db_session.query(ResumeUpdateRequest).get(target_id)
+    if not update_req:
+        return False
+        
+    update_req.status = action
+    
+    if action == "Approved":
+        user = db_session.query(User).get(update_req.employee_id)
+        if user:
+            user.resume_url = update_req.resume_url
+            
+    # Notify employee
+    try:
+        create_notification(
+            user_id=update_req.employee_id,
+            title=f"Resume Update {action}",
+            content=f"Your uploaded resume has been {action.lower()}.",
+            notification_type="System",
+            target_id=update_req.id,
+            action_url="/profile"
+        )
+    except Exception as e:
+        print(f"[ERROR] Failed to send Resume Update action notification: {e}")
+        
+    return True
+

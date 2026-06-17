@@ -70,10 +70,16 @@ class User(db.Model):
     salary = db.Column(db.Numeric(10, 2), nullable=True)
     rank = db.Column(db.String(50), nullable=True)
     manager_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    is_line_manager = db.Column(db.Boolean, default=False, nullable=False)
 
     # Documents
     aadhar_number = db.Column(db.String(20), nullable=True)
     resume_url = db.Column(db.String(255), nullable=True)
+    photo_url = db.Column(db.String(255), nullable=True)
+    phone_number = db.Column(db.String(20), nullable=True)
+    bio = db.Column(db.Text, nullable=True)
+    experience_summary = db.Column(db.Text, nullable=True)
+    gender = db.Column(db.String(20), default='Male', nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
@@ -100,13 +106,19 @@ class User(db.Model):
             "permanent_address": self.permanent_address,
             "current_address": self.current_address,
             "emergency_contact": self.emergency_contact,
+            "phone_number": self.phone_number,
             "department_id": self.department_id,
             "department_name": self.department.name if self.department else None,
             "date_of_joining": self.date_of_joining.isoformat() if self.date_of_joining else None,
             "rank": self.rank,
             "manager_id": self.manager_id,
             "manager_name": self.manager.name if self.manager else None,
+            "is_line_manager": self.is_line_manager,
             "resume_url": self.resume_url,
+            "photo_url": self.photo_url,
+            "bio": self.bio,
+            "experience_summary": self.experience_summary,
+            "gender": self.gender,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat(),
         }
@@ -231,6 +243,26 @@ class Attendance(db.Model):
             delta = self.check_out - self.check_in
             self.working_hours = round(delta.total_seconds() / 3600, 2)
 
+    def get_status(self):
+        """Calculate status dynamically based on check-in time."""
+        if not self.check_in:
+            return "Absent"
+        import datetime as dt
+        # Convert naive UTC datetime to Asia/Kolkata (IST)
+        if self.check_in.tzinfo is None:
+            utc_dt = self.check_in.replace(tzinfo=dt.timezone.utc)
+        else:
+            utc_dt = self.check_in
+        kolkata_tz = dt.timezone(dt.timedelta(hours=5, minutes=30))
+        local_time = utc_dt.astimezone(kolkata_tz).time()
+        
+        if local_time < dt.time(10, 0, 0):
+            return "Present"
+        elif local_time < dt.time(13, 0, 0):
+            return "Half Day"
+        else:
+            return "Absent"
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -242,6 +274,7 @@ class Attendance(db.Model):
             "working_hours": float(self.working_hours) if self.working_hours else 0.0,
             "latitude": self.latitude,
             "longitude": self.longitude,
+            "attendance_status": self.get_status()
         }
 
 
@@ -422,6 +455,26 @@ class ApprovalRequest(db.Model):
     approver = db.relationship("User", foreign_keys=[approver_id], backref=db.backref("assigned_approvals", lazy="dynamic"))
 
     def to_dict(self):
+        # Dynamic import to avoid circular dependencies
+        from models import UserProfileUpdate, WorkTransferRequest, CompOffRequest, ResumeUpdateRequest
+        target_details = None
+        if self.module_type == "UserProfileUpdate":
+            target = UserProfileUpdate.query.get(self.target_id)
+            if target:
+                target_details = target.to_dict()
+        elif self.module_type == "WorkTransfer":
+            target = WorkTransferRequest.query.get(self.target_id)
+            if target:
+                target_details = target.to_dict()
+        elif self.module_type == "CompOff":
+            target = CompOffRequest.query.get(self.target_id)
+            if target:
+                target_details = target.to_dict()
+        elif self.module_type == "ResumeUpdate":
+            target = ResumeUpdateRequest.query.get(self.target_id)
+            if target:
+                target_details = target.to_dict()
+
         return {
             "id": self.id,
             "requester_id": self.requester_id,
@@ -430,6 +483,7 @@ class ApprovalRequest(db.Model):
             "approver_name": self.approver.name if self.approver else None,
             "module_type": self.module_type,
             "target_id": self.target_id,
+            "target_details": target_details,
             "step_sequence": self.step_sequence,
             "status": self.status,
             "comments": self.comments,
@@ -502,6 +556,34 @@ class UserProfileUpdate(db.Model):
 
 
 # ============================================================
+# Resume Update Request
+# ============================================================
+class ResumeUpdateRequest(db.Model):
+    __tablename__ = "resume_update_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    resume_url = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", nullable=False)
+    approval_request_id = db.Column(db.Integer, db.ForeignKey("approval_requests.id", ondelete="SET NULL"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    employee = db.relationship("User", foreign_keys=[employee_id])
+    approval_request = db.relationship("ApprovalRequest", foreign_keys=[approval_request_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "employee_name": self.employee.name if self.employee else None,
+            "resume_url": self.resume_url,
+            "status": self.status,
+            "approval_request_id": self.approval_request_id,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
+
+
+# ============================================================
 # Notification
 # ============================================================
 class Notification(db.Model):
@@ -553,6 +635,7 @@ class Announcement(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    attachment_url = db.Column(db.String(255), nullable=True)
 
     # Relationships
     creator = db.relationship("User", foreign_keys=[created_by])
@@ -571,6 +654,7 @@ class Announcement(db.Model):
             "created_at": self.created_at.isoformat() + "Z",
             "expires_at": self.expires_at.isoformat() + "Z" if self.expires_at else None,
             "is_active": self.is_active,
+            "attachment_url": self.attachment_url,
         }
 
 
@@ -613,4 +697,187 @@ class WorkTransferRequest(db.Model):
             "approval_request_id": self.approval_request_id,
             "created_at": self.created_at.isoformat() + "Z",
         }
+
+
+# ============================================================
+# Registration Request
+# ============================================================
+class RegistrationRequest(db.Model):
+    __tablename__ = "registration_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    fathers_name = db.Column(db.String(100), nullable=True)
+    dob = db.Column(db.Date, nullable=True)
+    blood_group = db.Column(db.String(10), nullable=True)
+    address = db.Column(db.Text, nullable=True)
+    department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", nullable=False)
+    rejection_reason = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    actioned_at = db.Column(db.DateTime, nullable=True)
+
+    department = db.relationship("Department", foreign_keys=[department_id])
+    manager = db.relationship("User", foreign_keys=[manager_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "email": self.email,
+            "name": self.name,
+            "fathers_name": self.fathers_name,
+            "dob": self.dob.isoformat() if self.dob else None,
+            "blood_group": self.blood_group,
+            "address": self.address,
+            "department_id": self.department_id,
+            "department_name": self.department.name if self.department else None,
+            "manager_id": self.manager_id,
+            "manager_name": self.manager.name if self.manager else None,
+            "status": self.status,
+            "rejection_reason": self.rejection_reason,
+            "created_at": self.created_at.isoformat() + "Z",
+            "actioned_at": (self.actioned_at.isoformat() + "Z") if self.actioned_at else None,
+        }
+
+
+# ============================================================
+# Comp-Off Balance
+# ============================================================
+class CompOffBalance(db.Model):
+    __tablename__ = "comp_off_balances"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    allocated = db.Column(db.Integer, default=0)
+    used = db.Column(db.Integer, default=0)
+    remaining = db.Column(db.Integer, default=0)
+
+    employee = db.relationship("User", backref=db.backref("comp_off_balance", uselist=False, cascade="all, delete-orphan"))
+
+    def recalculate(self):
+        self.remaining = self.allocated - self.used
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "allocated": self.allocated,
+            "used": self.used,
+            "remaining": self.remaining
+        }
+
+
+# ============================================================
+# Comp-Off Request
+# ============================================================
+class CompOffRequest(db.Model):
+    __tablename__ = "comp_off_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    date_worked = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.Text, nullable=False)
+    status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending", nullable=False)
+    rejection_reason = db.Column(db.String(255), nullable=True)
+    approval_request_id = db.Column(db.Integer, db.ForeignKey("approval_requests.id", ondelete="SET NULL"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    actioned_at = db.Column(db.DateTime, nullable=True)
+
+    employee = db.relationship("User", foreign_keys=[employee_id])
+    approval_request = db.relationship("ApprovalRequest", foreign_keys=[approval_request_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "employee_name": self.employee.name if self.employee else None,
+            "date_worked": self.date_worked.isoformat(),
+            "reason": self.reason,
+            "status": self.status,
+            "rejection_reason": self.rejection_reason,
+            "approval_request_id": self.approval_request_id,
+            "created_at": self.created_at.isoformat() + "Z",
+            "actioned_at": (self.actioned_at.isoformat() + "Z") if self.actioned_at else None,
+        }
+
+
+# ============================================================
+# Timesheet
+# ============================================================
+class Timesheet(db.Model):
+    __tablename__ = "timesheets"
+
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    task_name = db.Column(db.String(150), nullable=False)
+    hours_spent = db.Column(db.Float, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    status = db.Column(db.Enum("Submitted", "Approved", "Rejected"), default="Submitted", nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = db.relationship("User", foreign_keys=[employee_id], backref=db.backref("timesheets", lazy="dynamic", cascade="all, delete-orphan"))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "employee_name": self.employee.name if self.employee else None,
+            "date": self.date.isoformat(),
+            "task_name": self.task_name,
+            "hours_spent": self.hours_spent,
+            "description": self.description,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
+
+
+# ============================================================
+# Policy & Handbook (with Version History support)
+# ============================================================
+class Policy(db.Model):
+    __tablename__ = "policies"
+
+    id = db.Column(db.Integer, primary_key=True)
+    policy_group_id = db.Column(db.Integer, nullable=True)
+    version = db.Column(db.Integer, default=1, nullable=False)
+    is_latest = db.Column(db.Boolean, default=True, nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    category = db.Column(db.Enum(
+        "Leave Policy",
+        "Attendance Policy",
+        "WFH Policy",
+        "Comp-Off Policy",
+        "Code of Conduct",
+        "Security Guidelines",
+        "Employee Handbook"
+    ), nullable=False)
+    attachment_url = db.Column(db.String(255), nullable=True)
+    updated_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    updater = db.relationship("User", foreign_keys=[updated_by])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "policy_group_id": self.policy_group_id,
+            "version": self.version,
+            "is_latest": self.is_latest,
+            "title": self.title,
+            "description": self.description,
+            "category": self.category,
+            "attachment_url": self.attachment_url,
+            "updated_by": self.updated_by,
+            "updated_by_name": self.updater.name if self.updater else "System",
+            "updated_at": self.updated_at.isoformat() + "Z"
+        }
+
+
 

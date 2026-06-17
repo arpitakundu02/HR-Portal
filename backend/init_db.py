@@ -68,15 +68,20 @@ def seed_admin(app):
         db.session.flush()
 
         # Create leave balances for admin too
-        for leave_type in ["APL", "WFH"]:
-            balance = LeaveBalance(
-                employee_id=admin.id,
-                leave_type=leave_type,
-                allocated=0,
-                used=0,
-                remaining=0,
-            )
-            db.session.add(balance)
+        db.session.add(LeaveBalance(
+            employee_id=admin.id,
+            leave_type="APL",
+            allocated=20,
+            used=0,
+            remaining=20,
+        ))
+        db.session.add(LeaveBalance(
+            employee_id=admin.id,
+            leave_type="WFH",
+            allocated=4, # Admin defaults to Male
+            used=0,
+            remaining=4,
+        ))
 
         db.session.commit()
         print(f"[✓] Admin account created: {ADMIN_EMAIL} / {ADMIN_PASSWORD}")

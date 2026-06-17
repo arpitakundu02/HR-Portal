@@ -346,7 +346,7 @@ def get_attendance_stats(current_user_id, current_user_role):
     total_users_count = user_query.count()
     
     # Query present employees today
-    present_query = db.session.query(func.count(Attendance.id)).join(
+    present_query = Attendance.query.join(
         User, Attendance.employee_id == User.id
     ).filter(
         Attendance.date == today,
@@ -356,7 +356,11 @@ def get_attendance_stats(current_user_id, current_user_role):
     if not include_inactive:
         present_query = present_query.filter(User.is_active == True)
         
-    present_today = present_query.scalar() or 0
+    present_today = 0
+    for r in present_query.all():
+        if r.get_status() in ("Present", "Half Day"):
+            present_today += 1
+            
     absent_today = max(0, total_users_count - present_today)
     
     return jsonify({
@@ -646,6 +650,51 @@ def action_regularization(id, current_user_id, current_user_role):
         current_app.logger.warning(f"Failed to send action email update: {notify_err}")
 
     return jsonify({"message": f"Regularization request marked as {status}.", "request": req.to_dict()}), 200
+
+
+# ------------------------------------------------------------------
+# GET /api/attendance/team  (Supervisor direct reports attendance)
+# ------------------------------------------------------------------
+@attendance_bp.route("/team", methods=["GET"])
+@jwt_required
+def get_team_attendance(current_user_id, current_user_role):
+    """
+    Supervisor view of attendance records of their direct reports.
+    """
+    reports = User.query.filter_by(manager_id=current_user_id, is_active=True).all()
+    if not reports:
+        return jsonify([]), 200
+    report_ids = [r.id for r in reports]
+
+    date_str = request.args.get("date")
+    month_str = request.args.get("month")
+
+    query = Attendance.query.filter(Attendance.employee_id.in_(report_ids))
+    if date_str:
+        try:
+            d = datetime.strptime(date_str, "%Y-%m-%d").date()
+            query = query.filter(Attendance.date == d)
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+    elif month_str:
+        try:
+            year, month = map(int, month_str.split("-"))
+            query = query.filter(
+                db.extract('year', Attendance.date) == year,
+                db.extract('month', Attendance.date) == month
+            )
+        except ValueError:
+            return jsonify({"error": "Invalid month format. Use YYYY-MM."}), 400
+
+    records = query.order_by(Attendance.date.desc(), Attendance.check_in.desc()).all()
+    serialized = []
+    for r in records:
+        d = r.to_dict()
+        d["attendance_status"] = r.get_status()
+        serialized.append(d)
+
+    return jsonify(serialized), 200
+
 
 
 
