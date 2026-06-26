@@ -513,6 +513,9 @@ def update_employee(emp_id, current_user_id, current_user_role):
                 (address, current_address, emergency_contact).
     """
     employee = User.query.get_or_404(emp_id)
+    if employee.role == "Admin" and current_user_id != emp_id:
+        return jsonify({"error": "Editing other Admin accounts is not allowed."}), 403
+
     current_user = User.query.get(current_user_id)
     is_line_manager_of_report = (
         current_user and 
@@ -618,6 +621,8 @@ def delete_employee(emp_id, current_user_id, current_user_role):
 def upload_resume(emp_id, current_user_id, current_user_role):
     """Upload a resume PDF/DOC for an employee."""
     employee = User.query.get_or_404(emp_id)
+    if employee.role == "Admin" and current_user_id != emp_id:
+        return jsonify({"error": "Editing other Admin accounts is not allowed."}), 403
 
     if current_user_role != "Admin" and current_user_id != emp_id:
         return jsonify({"error": "Unauthorized. You can only upload your own resume."}), 403
@@ -762,6 +767,8 @@ def serve_resume(filename):
 def upload_photo(emp_id, current_user_id, current_user_role):
     """Upload a profile photo image for an employee."""
     employee = User.query.get_or_404(emp_id)
+    if employee.role == "Admin" and current_user_id != emp_id:
+        return jsonify({"error": "Editing other Admin accounts is not allowed."}), 403
 
     # Only Admin or the user themselves can upload
     if current_user_role != "Admin" and current_user_id != emp_id:
@@ -858,6 +865,8 @@ def get_employee_dashboard_details(emp_id, current_user_id, current_user_role):
 def delete_photo(emp_id, current_user_id, current_user_role):
     """Delete the profile photo for an employee and revert to default initials."""
     employee = User.query.get_or_404(emp_id)
+    if employee.role == "Admin" and current_user_id != emp_id:
+        return jsonify({"error": "Editing other Admin accounts is not allowed."}), 403
 
     # Only Admin or the user themselves can delete
     if current_user_role != "Admin" and current_user_id != emp_id:

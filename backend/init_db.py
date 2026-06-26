@@ -107,6 +107,18 @@ def seed_settings(app):
         print("[✓] Default system settings seeded.")
 
 
+def seed_policies(app):
+    """Seed default policies if Policies table is empty."""
+    with app.app_context():
+        from models import Policy
+        if Policy.query.count() == 0:
+            from routes.policies import seed_default_policies
+            try:
+                seed_default_policies()
+                print("[✓] Default company policies seeded.")
+            except Exception as e:
+                print(f"[!] Failed to seed policies: {e}")
+
 def main():
     app = create_app()
 
@@ -118,6 +130,7 @@ def main():
     seed_departments(app)
     seed_admin(app)
     seed_settings(app)
+    seed_policies(app)
 
     print("\n[✓] Database initialisation complete. You can now start the Flask server.")
 
