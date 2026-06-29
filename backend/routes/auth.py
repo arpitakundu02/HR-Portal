@@ -69,7 +69,21 @@ def login():
     if not email or not password:
         return jsonify({"error": "Email and password are required."}), 400
 
-    user = User.query.filter_by(email=email, is_active=True).first()
+    print(f"DEBUG LOGIN: email={email}, role={role}", flush=True)
+    try:
+        user = User.query.filter_by(email=email, is_active=True).first()
+        print(f"DEBUG LOGIN: user found={user is not None}", flush=True)
+        if user:
+            print(f"DEBUG LOGIN: user.role={user.role}, user.is_active={user.is_active}", flush=True)
+    except Exception as e:
+        print(f"DEBUG LOGIN ERROR: {str(e)}", flush=True)
+
+    user = None
+    try:
+        user = User.query.filter_by(email=email, is_active=True).first()
+    except Exception:
+        pass
+
     if not user:
         return jsonify({"error": "Invalid credentials."}), 401
 
