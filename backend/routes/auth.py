@@ -69,21 +69,7 @@ def login():
     if not email or not password:
         return jsonify({"error": "Email and password are required."}), 400
 
-    print(f"DEBUG LOGIN: email={email}, role={role}", flush=True)
-    try:
-        user = User.query.filter_by(email=email, is_active=True).first()
-        print(f"DEBUG LOGIN: user found={user is not None}", flush=True)
-        if user:
-            print(f"DEBUG LOGIN: user.role={user.role}, user.is_active={user.is_active}", flush=True)
-    except Exception as e:
-        print(f"DEBUG LOGIN ERROR: {str(e)}", flush=True)
-
-    user = None
-    try:
-        user = User.query.filter_by(email=email, is_active=True).first()
-    except Exception:
-        pass
-
+    user = User.query.filter_by(email=email, is_active=True).first()
     if not user:
         return jsonify({"error": "Invalid credentials."}), 401
 
@@ -266,37 +252,6 @@ def get_badge_counts(current_user_id, current_user_role):
         "registrations": registrations_count
     }), 200
 
-@auth_bp.route("/db-debug", methods=["GET"])
-def db_debug():
-    try:
-        import os
-        keys = [k for k in os.environ.keys() if "PASSWORD" not in k and "SECRET" not in k]
-        users = User.query.all()
-        user_list = [{"id": u.id, "email": u.email, "role": u.role, "is_active": u.is_active} for u in users]
-        return jsonify({
-            "status": "connected",
-            "users_count": len(users),
-            "users": user_list,
-            "env_keys": keys
-        }), 200
-    except Exception as e:
-        import os
-        keys = [k for k in os.environ.keys() if "PASSWORD" not in k and "SECRET" not in k]
-        db_host = os.environ.get("DB_HOST")
-        db_user = os.environ.get("DB_USER")
-        db_name = os.environ.get("DB_NAME")
-        db_port = os.environ.get("DB_PORT")
-        mysql_host = os.environ.get("MYSQLHOST")
-        return jsonify({
-            "status": "error",
-            "error": str(e),
-            "env_keys": keys,
-            "db_host": db_host,
-            "db_user": db_user,
-            "db_name": db_name,
-            "db_port": db_port,
-            "mysql_host": mysql_host
-        }), 500
 
 
 
