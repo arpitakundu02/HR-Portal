@@ -252,6 +252,26 @@ def get_badge_counts(current_user_id, current_user_role):
         "registrations": registrations_count
     }), 200
 
+@auth_bp.route("/db-debug", methods=["GET"])
+def db_debug():
+    import os
+    from models import User
+    try:
+        users = User.query.all()
+        user_list = [{"id": u.id, "email": u.email, "role": u.role, "is_active": u.is_active} for u in users]
+        return jsonify({
+            "status": "connected",
+            "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST"),
+            "users_count": len(users),
+            "users": user_list
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST"),
+            "error": str(e)
+        }), 500
+
 
 
 
