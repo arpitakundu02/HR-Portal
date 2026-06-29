@@ -40,6 +40,8 @@ class Config:
     if DB_HOST in ["mysql.railway.internal", "localhost", ""] and os.environ.get("RAILWAY_ENVIRONMENT") == "production":
         DB_HOST = "reseau.proxy.rlwy.net"
         DB_PORT = "50112"
+        if DB_PASSWORD == "AKnk8700":
+            DB_PASSWORD = "ApmpdxSyZuvGURRprlyPTiTmMleqfbCb"
 
     SQLALCHEMY_DATABASE_URI: str = (
         f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}"
