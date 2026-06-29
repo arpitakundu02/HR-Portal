@@ -1,3 +1,4 @@
+# Trigger redeployment with public MySQL credentials
 import os
 import sys
 
