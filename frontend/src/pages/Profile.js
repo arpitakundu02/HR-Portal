@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
 import { useToast } from '../components/common/Toast';
-import { getMe, updateEmployee, uploadResume, uploadPhoto, deletePhoto } from '../services/api';
+import { getMe, updateEmployee, uploadResume, uploadPhoto, deletePhoto, getDepartments } from '../services/api';
 import { EditIcon, DownloadIcon, UploadIcon, SaveIcon, LockIcon, EyeIcon, EyeOffIcon, CameraIcon, TrashIcon } from '../components/common/Icons';
 
 export default function Profile() {
@@ -21,9 +21,12 @@ export default function Profile() {
   const [editMode, setEditMode] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  const [departments, setDepartments] = useState([]);
+
   // Editable fields
   const [form, setForm] = useState({
-    address: '', current_address: '', permanent_address: '', emergency_contact: '', phone_number: '', bio: '', experience_summary: '', gender: '',
+    address: '', current_address: '', permanent_address: '', emergency_contact: '', phone_number: '', bio: '', experience_summary: '', gender: '', fathers_name: '', dob: '', blood_group: '',
+    department_id: '', rank: '', date_of_joining: '', salary: '', aadhar_number: '',
   });
 
   const [uploadingResume, setUploadingResume] = useState(false);
@@ -93,6 +96,9 @@ export default function Profile() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
+    if (isAdmin) {
+      getDepartments().then((r) => setDepartments(r.data)).catch(() => {});
+    }
     (async () => {
       try {
         const { data } = await getMe();
@@ -106,6 +112,14 @@ export default function Profile() {
           bio:               data.bio               || '',
           experience_summary:data.experience_summary|| '',
           gender:            data.gender            || 'Male',
+          fathers_name:      data.fathers_name      || '',
+          dob:               data.dob               || '',
+          blood_group:       data.blood_group       || '',
+          department_id:     data.department_id     || '',
+          rank:              data.rank              || '',
+          date_of_joining:   data.date_of_joining   || '',
+          salary:            data.salary            || '',
+          aadhar_number:     data.aadhar_number     || '',
         });
       } catch { toast.error('Failed to load profile.'); }
       finally { setLoading(false); }
@@ -222,22 +236,76 @@ export default function Profile() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ gap: 24 }}>
+      {/* About Me Card */}
+      <div className="card" style={{ marginTop: 24, padding: 20 }}>
+        <div className="card-header" style={{ padding: '0 0 16px 0', borderBottom: '1px solid var(--border)' }}>
+          <div className="card-title" style={{ margin: 0 }}>📝 About Me</div>
+        </div>
+        {editMode ? (
+          <div className="form-group" style={{ marginTop: 16 }}>
+            <textarea
+              className="form-control"
+              rows={4}
+              value={form.bio}
+              placeholder="Tell us about yourself..."
+              onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+            />
+            <small className="form-text text-muted" style={{ display: 'block', marginTop: 4 }}>
+              Recommendation: A bio of 50+ words is suggested for a complete profile. Current word count: {form.bio ? form.bio.trim().split(/\s+/).filter(Boolean).length : 0}
+            </small>
+          </div>
+        ) : (
+          <div style={{ paddingTop: 16 }}>
+            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
+              {profile.bio || 'No bio submitted yet.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="grid-2" style={{ gap: 24, marginTop: 24 }}>
         {/* Personal Information */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">👤 Personal Information</div>
           </div>
-          <div className="info-grid">
-            <InfoRow label="Full Name"      value={profile.name} />
-            <InfoRow label="Father's Name"  value={profile.fathers_name} />
-            <InfoRow label="Date of Birth"  value={profile.dob} />
-            <InfoRow label="Blood Group"    value={profile.blood_group} />
-            <InfoRow label="Email"          value={profile.email} />
-            <InfoRow label="Phone Number"   value={profile.phone_number} />
-            <InfoRow label="Emergency Contact" value={profile.emergency_contact} />
-            <InfoRow label="Gender"          value={profile.gender} />
-          </div>
+          {editMode && isAdmin ? (
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Father's Name</label>
+                <input className="form-control" name="fathers_name" value={form.fathers_name} onChange={(e) => setForm(f => ({ ...f, fathers_name: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Date of Birth</label>
+                <input className="form-control" type="date" name="dob" value={form.dob} onChange={(e) => setForm(f => ({ ...f, dob: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Blood Group</label>
+                <select className="form-control" name="blood_group" value={form.blood_group} onChange={(e) => setForm(f => ({ ...f, blood_group: e.target.value }))}>
+                  <option value="">Select</option>
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((bg) => <option key={bg} value={bg}>{bg}</option>)}
+                </select>
+              </div>
+              <div className="info-grid" style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <InfoRow label="Full Name"      value={profile.name} />
+                <InfoRow label="Email"          value={profile.email} />
+                <InfoRow label="Phone Number"   value={profile.phone_number} />
+                <InfoRow label="Emergency Contact" value={profile.emergency_contact} />
+                <InfoRow label="Gender"          value={profile.gender} />
+              </div>
+            </div>
+          ) : (
+            <div className="info-grid">
+              <InfoRow label="Full Name"      value={profile.name} />
+              <InfoRow label="Father's Name"  value={profile.fathers_name} />
+              <InfoRow label="Date of Birth"  value={profile.dob} />
+              <InfoRow label="Blood Group"    value={profile.blood_group} />
+              <InfoRow label="Email"          value={profile.email} />
+              <InfoRow label="Phone Number"   value={profile.phone_number} />
+              <InfoRow label="Emergency Contact" value={profile.emergency_contact} />
+              <InfoRow label="Gender"          value={profile.gender} />
+            </div>
+          )}
         </div>
 
         {/* Employment Information */}
@@ -245,14 +313,46 @@ export default function Profile() {
           <div className="card-header">
             <div className="card-title">🏢 Employment Details</div>
           </div>
-          <div className="info-grid">
-            <InfoRow label="Employee ID"   value={profile.employee_id} />
-            <InfoRow label="Department"    value={profile.department_name} />
-            <InfoRow label="Designation"   value={profile.rank} />
-            <InfoRow label="Date of Joining" value={profile.date_of_joining} />
-            {isAdmin && <InfoRow label="Salary"  value={profile.salary ? `₹${Number(profile.salary).toLocaleString()}` : '—'} />}
-            {isAdmin && <InfoRow label="Aadhar"  value={profile.aadhar_number} />}
-          </div>
+          {editMode && isAdmin ? (
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Employee ID</label>
+                <input className="form-control" value={profile.employee_id} readOnly disabled />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Department</label>
+                <select className="form-control" name="department_id" value={form.department_id} onChange={(e) => setForm(f => ({ ...f, department_id: e.target.value }))}>
+                  <option value="">Select Department</option>
+                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Designation / Rank</label>
+                <input className="form-control" name="rank" value={form.rank} onChange={(e) => setForm(f => ({ ...f, rank: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Date of Joining</label>
+                <input className="form-control" type="date" name="date_of_joining" value={form.date_of_joining} onChange={(e) => setForm(f => ({ ...f, date_of_joining: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Salary (₹)</label>
+                <input className="form-control" type="number" name="salary" value={form.salary} onChange={(e) => setForm(f => ({ ...f, salary: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 600 }}>Aadhar Number</label>
+                <input className="form-control" name="aadhar_number" value={form.aadhar_number} onChange={(e) => setForm(f => ({ ...f, aadhar_number: e.target.value }))} />
+              </div>
+            </div>
+          ) : (
+            <div className="info-grid">
+              <InfoRow label="Employee ID"   value={profile.employee_id} />
+              <InfoRow label="Department"    value={profile.department_name} />
+              <InfoRow label="Designation"   value={profile.rank} />
+              <InfoRow label="Date of Joining" value={profile.date_of_joining} />
+              {isAdmin && <InfoRow label="Salary"  value={profile.salary ? `₹${Number(profile.salary).toLocaleString()}` : '—'} />}
+              {isAdmin && <InfoRow label="Aadhar"  value={profile.aadhar_number} />}
+            </div>
+          )}
           <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)' }}>
             {profile.resume_url ? (
               <div>
@@ -392,19 +492,6 @@ export default function Profile() {
           {editMode ? (
             <div>
               <div className="form-group">
-                <label className="form-label">Bio / About Me</label>
-                <textarea
-                  className="form-control"
-                  rows={4}
-                  value={form.bio}
-                  placeholder="Tell us about yourself..."
-                  onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-                />
-                <small className="form-text text-muted" style={{ display: 'block', marginTop: 4 }}>
-                  Recommendation: A bio of 50+ words is suggested for a complete profile. Current word count: {form.bio ? form.bio.trim().split(/\s+/).filter(Boolean).length : 0}
-                </small>
-              </div>
-              <div className="form-group" style={{ marginTop: 16 }}>
                 <label className="form-label">Experience Summary</label>
                 <textarea
                   className="form-control"
@@ -421,12 +508,6 @@ export default function Profile() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 4px' }}>
               <div>
-                <strong style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Bio / About Me</strong>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
-                  {profile.bio || 'No bio submitted yet.'}
-                </p>
-              </div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
                 <strong style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Experience Summary</strong>
                 <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
                   {profile.experience_summary || 'No experience summary submitted yet.'}

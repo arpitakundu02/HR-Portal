@@ -9,7 +9,7 @@ import EmployeeForm from '../components/forms/EmployeeForm';
 import { useToast } from '../components/common/Toast';
 import {
   getEmployees, createEmployee, updateEmployee, deleteEmployee,
-  getDepartments, uploadResume,
+  getDepartments, uploadResume, getEmployeeDashboardDetails,
 } from '../services/api';
 import { EditIcon, TrashIcon, PaperclipIcon, PlusIcon, UploadIcon, UsersIcon } from '../components/common/Icons';
 
@@ -36,6 +36,30 @@ export default function Employees() {
   const [showDelete,   setShowDelete]   = useState(null);
   const [showResume,   setShowResume]   = useState(null);
   const [resumeFile,   setResumeFile]   = useState(null);
+  const [quickProfile, setQuickProfile] = useState(null);
+  const [selectedEmpDetails, setSelectedEmpDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+
+  const handleOpenQuickProfile = async (emp) => {
+    setDetailsLoading(true);
+    setSelectedEmpDetails(null);
+    setQuickProfile(emp);
+    try {
+      const { data } = await getEmployeeDashboardDetails(emp.id);
+      setSelectedEmpDetails(data);
+    } catch {
+      toast.error('Failed to load employee details.');
+      setQuickProfile(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const handleOpenFullProfile = () => {
+    const id = quickProfile.id;
+    setQuickProfile(null);
+    navigate(`/employees/${id}`);
+  };
 
   useEffect(() => { getDepartments().then((r) => setDepartments(r.data)); }, []);
 
@@ -209,7 +233,13 @@ export default function Employees() {
                               )}
                               <span
                                 style={{ fontWeight: 600, cursor: 'pointer', color: 'var(--accent)' }}
-                                onClick={() => navigate(`/employees/${emp.id}`)}
+                                onClick={() => {
+                                  if (canManage) {
+                                    handleOpenQuickProfile(emp);
+                                  } else {
+                                    navigate(`/employees/${emp.id}`);
+                                  }
+                                }}
                               >
                                 {emp.name}
                               </span>
@@ -224,9 +254,13 @@ export default function Employees() {
                           <td><Badge status={emp.is_active ? 'Active' : 'Inactive'} /></td>
                           <td>
                             <div className="table-actions">
-                              <button className="btn btn-secondary btn-sm" onClick={() => { setEditTarget(emp); setShowForm(true); }} title="Edit"><EditIcon /></button>
-                              <button className="btn btn-ghost btn-sm" onClick={() => setShowResume(emp)} title="Upload Resume"><PaperclipIcon /></button>
-                              <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(emp)} title="Deactivate"><TrashIcon /></button>
+                              {emp.role !== 'Admin' && (
+                                <>
+                                  <button className="btn btn-secondary btn-sm" onClick={() => { setEditTarget(emp); setShowForm(true); }} title="Edit"><EditIcon /></button>
+                                  <button className="btn btn-ghost btn-sm" onClick={() => setShowResume(emp)} title="Upload Resume"><PaperclipIcon /></button>
+                                  <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(emp)} title="Deactivate"><TrashIcon /></button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </>
@@ -321,6 +355,102 @@ export default function Employees() {
           <button className="btn btn-secondary" onClick={() => { setShowResume(null); setResumeFile(null); }}>Cancel</button>
           <button className="btn btn-primary" onClick={handleResumeUpload} disabled={!resumeFile}><UploadIcon style={{ marginRight: 6 }} /> Upload</button>
         </div>
+      </Modal>
+
+      {/* Quick Profile Modal */}
+      <Modal
+        isOpen={!!quickProfile}
+        onClose={() => setQuickProfile(null)}
+        title="Quick Employee Profile"
+        size="lg"
+        footer={
+          !detailsLoading && selectedEmpDetails ? (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, width: '100%' }}>
+              <button className="btn btn-secondary" onClick={() => setQuickProfile(null)}>Close</button>
+              <button className="btn btn-primary" onClick={handleOpenFullProfile}>Open Full Profile</button>
+            </div>
+          ) : null
+        }
+      >
+        {detailsLoading || !selectedEmpDetails ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+            <Spinner />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Header portion inside modal */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+              {selectedEmpDetails.profile.photo_url ? (
+                <img src={selectedEmpDetails.profile.photo_url} alt={selectedEmpDetails.profile.name} style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }} />
+              ) : (
+                <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, border: '2px solid var(--border)' }}>
+                  {selectedEmpDetails.profile.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 800, fontSize: 18 }}>{selectedEmpDetails.profile.name}</h3>
+                <p style={{ margin: '2px 0 6px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+                  {selectedEmpDetails.profile.rank || 'Designation N/A'} &middot; {selectedEmpDetails.profile.department_name || 'No Department'}
+                </p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Badge status={selectedEmpDetails.profile.is_line_manager ? 'Line Manager' : selectedEmpDetails.profile.role} />
+                  <Badge status={selectedEmpDetails.profile.is_active ? 'Active' : 'Inactive'} />
+                  <Badge status={selectedEmpDetails.profile.availability_status} />
+                  <span className="badge badge-apl" style={{ fontSize: 11 }}>{selectedEmpDetails.profile.employee_id}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* About Me Card */}
+            <div className="card" style={{ padding: 16 }}>
+              <h4 style={{ marginTop: 0, marginBottom: 10, borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>📝 About Me</h4>
+              <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5, color: 'var(--text-primary)', fontSize: 13.5 }}>
+                {selectedEmpDetails.profile.bio || 'No bio submitted yet.'}
+              </p>
+            </div>
+
+            {/* Profile details and leaves */}
+            <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="card" style={{ padding: 16 }}>
+                <h4 style={{ marginTop: 0, marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>👤 Profile Details</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+                  <div><strong>Email:</strong> <span style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>{selectedEmpDetails.profile.email}</span></div>
+                  <div><strong>Phone Number:</strong> <span style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>{selectedEmpDetails.profile.phone_number || '—'}</span></div>
+                  <div><strong>Gender:</strong> <span style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>{selectedEmpDetails.profile.gender || 'Male'}</span></div>
+                  <div><strong>Date of Joining:</strong> <span style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>{selectedEmpDetails.profile.date_of_joining || '—'}</span></div>
+                </div>
+              </div>
+
+              <div className="card" style={{ padding: 16 }}>
+                <h4 style={{ marginTop: 0, marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 6 }}>📊 Leaves Summary</h4>
+                {selectedEmpDetails.leave_summary.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>No leave balance records found.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {selectedEmpDetails.leave_summary.map(balance => {
+                      const percent = balance.allocated > 0 ? Math.min(100, Math.round((balance.used / balance.allocated) * 100)) : 0;
+                      return (
+                        <div key={balance.id} style={{ fontSize: 12.5 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontWeight: 600 }}>
+                            <span>{balance.leave_type === 'APL' ? 'Annual Privilege Leave (APL)' : 'Work From Home (WFH)'}</span>
+                            <span>{balance.used} / {balance.allocated} Days</span>
+                          </div>
+                          <div style={{ width: '100%', height: 6, backgroundColor: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ width: `${percent}%`, height: '100%', backgroundColor: balance.leave_type === 'APL' ? '#f59e0b' : '#3b82f6', borderRadius: 3 }} />
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+                            <span>Remaining: {balance.remaining} days</span>
+                            <span>{percent}% Used</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -218,71 +218,75 @@ export default function EmployeeDetailDashboard() {
 
       {/* Tab Contents */}
       {activeTab === 'overview' && (
-        <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-          {/* Profile details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* About Me Card */}
           <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Profile Details</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div><strong>Email:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.email}</span></div>
-              <div><strong>Phone Number:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.phone_number || '—'}</span></div>
-              <div><strong>Status:</strong> <span style={{ marginLeft: 6 }}><Badge status={profile.availability_status} /></span></div>
-              <div><strong>Father's Name:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.fathers_name || '—'}</span></div>
-              <div><strong>Date of Birth:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.dob || '—'}</span></div>
-              <div><strong>Blood Group:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.blood_group || '—'}</span></div>
-              <div><strong>Gender:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.gender || 'Male'}</span></div>
-              <div><strong>Aadhar Number:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.aadhar_number || '—'}</span></div>
-              <div><strong>Date of Joining:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.date_of_joining || '—'}</span></div>
-              <div><strong>Emergency Contact:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.emergency_contact || '—'}</span></div>
-              <div><strong>Current Address:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.current_address || '—'}</span></div>
-              <div><strong>Permanent Address:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.permanent_address || '—'}</span></div>
-              <div><strong>Resume:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.resume_url ? <a href={`${profile.resume_url}?auth_token=${sessionStorage.getItem('hr_token')}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', padding: '2px 8px', fontSize: 12, marginLeft: 6 }}><DownloadIcon style={{ width: 12, height: 12, marginRight: 4 }} /> Download Resume</a> : 'No approved resume uploaded'}</span></div>
+            <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>📝 About Me</h3>
+            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
+              {profile.bio || 'No bio submitted yet.'}
+            </p>
+          </div>
+
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            {/* Profile details */}
+            <div className="card" style={{ padding: 20 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Profile Details</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div><strong>Email:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.email}</span></div>
+                <div><strong>Phone Number:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.phone_number || '—'}</span></div>
+                <div><strong>Status:</strong> <span style={{ marginLeft: 6 }}><Badge status={profile.availability_status} /></span></div>
+                <div><strong>Father's Name:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.fathers_name || '—'}</span></div>
+                <div><strong>Date of Birth:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.dob || '—'}</span></div>
+                <div><strong>Blood Group:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.blood_group || '—'}</span></div>
+                <div><strong>Gender:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.gender || 'Male'}</span></div>
+                <div><strong>Aadhar Number:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.aadhar_number || '—'}</span></div>
+                <div><strong>Date of Joining:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.date_of_joining || '—'}</span></div>
+                <div><strong>Emergency Contact:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.emergency_contact || '—'}</span></div>
+                <div><strong>Current Address:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.current_address || '—'}</span></div>
+                <div><strong>Permanent Address:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.permanent_address || '—'}</span></div>
+                <div><strong>Resume:</strong> <span style={{ color: 'var(--text-secondary)' }}>{profile.resume_url ? <a href={`${profile.resume_url}?auth_token=${sessionStorage.getItem('hr_token')}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', padding: '2px 8px', fontSize: 12, marginLeft: 6 }}><DownloadIcon style={{ width: 12, height: 12, marginRight: 4 }} /> Download Resume</a> : 'No approved resume uploaded'}</span></div>
+              </div>
             </div>
-          </div>
 
-          {/* Leaves Details */}
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Leaves Summary</h3>
-            {leave_summary.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)' }}>No leave balance records found.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {leave_summary.map(balance => {
-                  const percent = balance.allocated > 0 ? Math.min(100, Math.round((balance.used / balance.allocated) * 100)) : 0;
-                  return (
-                    <div key={balance.id} className="card" style={{ padding: 16, backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontWeight: 700 }}>
-                        <span>{balance.leave_type === 'APL' ? 'Annual Privilege Leave (APL)' : 'Work From Home (WFH)'}</span>
-                        <span>{balance.used} / {balance.allocated} Days Taken</span>
+            {/* Leaves Details */}
+            <div className="card" style={{ padding: 20 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Leaves Summary</h3>
+              {leave_summary.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>No leave balance records found.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {leave_summary.map(balance => {
+                    const percent = balance.allocated > 0 ? Math.min(100, Math.round((balance.used / balance.allocated) * 100)) : 0;
+                    return (
+                      <div key={balance.id} className="card" style={{ padding: 16, backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontWeight: 700 }}>
+                          <span>{balance.leave_type === 'APL' ? 'Annual Privilege Leave (APL)' : 'Work From Home (WFH)'}</span>
+                          <span>{balance.used} / {balance.allocated} Days Taken</span>
+                        </div>
+                        <div style={{ width: '100%', height: 10, backgroundColor: 'var(--border)', borderRadius: 5, overflow: 'hidden' }}>
+                          <div style={{ width: `${percent}%`, height: '100%', backgroundColor: balance.leave_type === 'APL' ? '#f59e0b' : '#3b82f6', borderRadius: 5 }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                          <span>Remaining: {balance.remaining} days</span>
+                          <span>{percent}% Used</span>
+                        </div>
                       </div>
-                      <div style={{ width: '100%', height: 10, backgroundColor: 'var(--border)', borderRadius: 5, overflow: 'hidden' }}>
-                        <div style={{ width: `${percent}%`, height: '100%', backgroundColor: balance.leave_type === 'APL' ? '#f59e0b' : '#3b82f6', borderRadius: 5 }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                        <span>Remaining: {balance.remaining} days</span>
-                        <span>{percent}% Used</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-          {/* Professional Profile Card */}
-          <div className="card" style={{ padding: 20, gridColumn: 'span 2' }}>
-            <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Professional Profile</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <strong style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Bio / About Me</strong>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
-                  {profile.bio || 'No bio submitted yet.'}
-                </p>
-              </div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                <strong style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Experience Summary</strong>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
-                  {profile.experience_summary || 'No experience summary submitted yet.'}
-                </p>
+            {/* Professional Profile Card */}
+            <div className="card" style={{ padding: 20, gridColumn: 'span 2' }}>
+              <h3 style={{ marginTop: 0, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Professional Profile</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <strong style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Experience Summary</strong>
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text-primary)', fontSize: 14 }}>
+                    {profile.experience_summary || 'No experience summary submitted yet.'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
