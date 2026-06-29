@@ -30,11 +30,11 @@ class Config:
     # ------------------------------------------------------------------ #
     # MySQL / SQLAlchemy
     # ------------------------------------------------------------------ #
-    DB_HOST: str = os.environ.get("DB_HOST", "localhost")
-    DB_USER: str = os.environ.get("DB_USER", "root")
-    DB_PASSWORD: str = os.environ.get("DB_PASSWORD", "")
-    DB_NAME: str = os.environ.get("DB_NAME", "hr_portal")
-    DB_PORT: str = os.environ.get("DB_PORT", "3306")
+    DB_HOST: str = os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST") or "localhost"
+    DB_USER: str = os.environ.get("DB_USER") or os.environ.get("MYSQLUSER") or "root"
+    DB_PASSWORD: str = os.environ.get("DB_PASSWORD") or os.environ.get("MYSQLPASSWORD") or ""
+    DB_NAME: str = os.environ.get("DB_NAME") or os.environ.get("MYSQLDATABASE") or "hr_portal"
+    DB_PORT: str = os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT") or "3306"
 
     SQLALCHEMY_DATABASE_URI: str = (
         f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}"
