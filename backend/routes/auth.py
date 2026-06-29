@@ -256,6 +256,15 @@ def get_badge_counts(current_user_id, current_user_role):
 def db_debug():
     import os
     from models import User
+    
+    # Sanitize and get all environment variables
+    env_dump = {}
+    for k, v in os.environ.items():
+        if any(secret_term in k.upper() for secret_term in ["PASSWORD", "SECRET", "KEY", "TOKEN"]):
+            env_dump[k] = "[REDACTED]"
+        else:
+            env_dump[k] = v
+
     try:
         users = User.query.all()
         user_list = [{"id": u.id, "email": u.email, "role": u.role, "is_active": u.is_active} for u in users]
@@ -263,13 +272,15 @@ def db_debug():
             "status": "connected",
             "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST"),
             "users_count": len(users),
-            "users": user_list
+            "users": user_list,
+            "env": env_dump
         }), 200
     except Exception as e:
         return jsonify({
             "status": "error",
             "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST"),
-            "error": str(e)
+            "error": str(e),
+            "env": env_dump
         }), 500
 
 
