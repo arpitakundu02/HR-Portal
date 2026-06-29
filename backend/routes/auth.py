@@ -282,10 +282,20 @@ def db_debug():
     except Exception as e:
         import os
         keys = [k for k in os.environ.keys() if "PASSWORD" not in k and "SECRET" not in k]
+        db_host = os.environ.get("DB_HOST")
+        db_user = os.environ.get("DB_USER")
+        db_name = os.environ.get("DB_NAME")
+        db_port = os.environ.get("DB_PORT")
+        mysql_host = os.environ.get("MYSQLHOST")
         return jsonify({
             "status": "error",
             "error": str(e),
-            "env_keys": keys
+            "env_keys": keys,
+            "db_host": db_host,
+            "db_user": db_user,
+            "db_name": db_name,
+            "db_port": db_port,
+            "mysql_host": mysql_host
         }), 500
 
 
