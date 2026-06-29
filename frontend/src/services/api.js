@@ -11,7 +11,7 @@ import axios from 'axios';
 
 // Base URL proxied to Flask via package.json "proxy" setting
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: process.env.REACT_APP_API_URL || '/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
