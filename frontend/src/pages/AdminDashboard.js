@@ -14,7 +14,7 @@ import Badge from '../components/common/Badge';
 import AnnouncementWidget from '../components/common/AnnouncementWidget';
 import { getEmployees, getLeaveRequests, actionLeaveRequest, getMeetings, getEmployeeStats, getTaskStats, getAttendanceStats, getLeaveStats, getPoliciesStats } from '../services/api';
 import { useToast } from '../components/common/Toast';
-import { UsersIcon, ClockIcon, DocumentTextIcon, ClipboardCheckIcon, CalendarIcon, CheckIcon, CloseIcon, HourglassIcon, UserIcon, InboxIcon } from '../components/common/Icons';
+import { UsersIcon, ClockIcon, DocumentTextIcon, ClipboardCheckIcon, CalendarIcon, CheckIcon, CloseIcon, HourglassIcon, UserIcon } from '../components/common/Icons';
 
 const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#38bdf8', '#a78bfa', '#34d399', '#fb923c'];
 

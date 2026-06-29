@@ -9,7 +9,7 @@ import Badge from '../components/common/Badge';
 import AnnouncementWidget from '../components/common/AnnouncementWidget';
 import { getLeaveBalances, getTodayStatus, getTasks, getMeetings, getHolidays, getPoliciesStats } from '../services/api';
 import { useToast } from '../components/common/Toast';
-import { DocumentTextIcon, HomeIcon, ClipboardCheckIcon, UserGroupIcon, InboxIcon, ClockIcon, CalendarIcon, CheckIcon, UsersIcon, ShieldCheckIcon } from '../components/common/Icons';
+import { DocumentTextIcon, HomeIcon, ClipboardCheckIcon, UserGroupIcon, InboxIcon, ClockIcon, CalendarIcon, CheckIcon, UsersIcon } from '../components/common/Icons';
 
 export default function EmployeeDashboard() {
   const toast    = useToast();

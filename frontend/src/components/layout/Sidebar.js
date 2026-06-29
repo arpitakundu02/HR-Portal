@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
-import { getNotificationsUnreadCount, getPendingApprovals, getBadgeCounts } from '../../services/api';
+import { getNotificationsUnreadCount, getBadgeCounts } from '../../services/api';
 import {
   ChartBarIcon,
   UsersIcon,

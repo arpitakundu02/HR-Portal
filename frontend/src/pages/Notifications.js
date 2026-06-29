@@ -32,7 +32,7 @@ import {
 } from '../components/common/Icons';
 
 export default function Notifications() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const toast = useToast();
   const location = useLocation();
 

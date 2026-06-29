@@ -9,13 +9,9 @@ import {
   getEmployees 
 } from '../services/api';
 import { 
-  CalendarIcon, 
   PlusIcon, 
-  InboxIcon, 
   CloseIcon, 
-  SaveIcon, 
-  UsersIcon,
-  CheckIcon
+  SaveIcon
 } from '../components/common/Icons';
 
 export default function WorkTransfers() {

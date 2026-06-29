@@ -14,8 +14,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import {
-  ArrowLeftIcon, CameraIcon, CalendarIcon, CheckIcon, CloseIcon,
-  DocumentTextIcon, UsersIcon, ClockIcon, EditIcon, TrashIcon, DownloadIcon
+  ArrowLeftIcon, CameraIcon, TrashIcon, DownloadIcon
 } from '../components/common/Icons';
 
 export default function EmployeeDetailDashboard() {
@@ -23,7 +22,6 @@ export default function EmployeeDetailDashboard() {
   const navigate = useNavigate();
   const toast = useToast();
   const { isAdmin, user } = useAuth();
-  const isManager = user?.is_line_manager === true;
   const currentUserId = user?.id;
 
   const [data, setData] = useState(null);

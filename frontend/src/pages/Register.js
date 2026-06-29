@@ -7,7 +7,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { registerEmployee } from '../services/api';
 import { useToast } from '../components/common/Toast';
-import { EyeIcon, EyeOffIcon, BuildingIcon, SunIcon, MoonIcon, SparklesIcon, UsersIcon, ClockIcon, CalendarIcon, ChartBarIcon, ShieldCheckIcon, UserIcon } from '../components/common/Icons';
+import { EyeIcon, EyeOffIcon, BuildingIcon, SunIcon, MoonIcon, SparklesIcon, UsersIcon, ShieldCheckIcon } from '../components/common/Icons';
 
 export default function Register() {
   const { theme, toggleTheme } = useTheme();
