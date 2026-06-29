@@ -269,17 +269,23 @@ def get_badge_counts(current_user_id, current_user_role):
 @auth_bp.route("/db-debug", methods=["GET"])
 def db_debug():
     try:
+        import os
+        keys = [k for k in os.environ.keys() if "PASSWORD" not in k and "SECRET" not in k]
         users = User.query.all()
         user_list = [{"id": u.id, "email": u.email, "role": u.role, "is_active": u.is_active} for u in users]
         return jsonify({
             "status": "connected",
             "users_count": len(users),
-            "users": user_list
+            "users": user_list,
+            "env_keys": keys
         }), 200
     except Exception as e:
+        import os
+        keys = [k for k in os.environ.keys() if "PASSWORD" not in k and "SECRET" not in k]
         return jsonify({
             "status": "error",
-            "error": str(e)
+            "error": str(e),
+            "env_keys": keys
         }), 500
 
 
