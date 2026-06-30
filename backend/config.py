@@ -36,12 +36,6 @@ class Config:
     DB_NAME: str = os.environ.get("DB_NAME") or os.environ.get("MYSQLDATABASE") or "hr_portal"
     DB_PORT: str = os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT") or "3306"
 
-    # Railway internal DNS workaround: redirect private host to public proxy
-    if DB_HOST in ["mysql.railway.internal", "localhost", ""] and os.environ.get("RAILWAY_ENVIRONMENT") == "production":
-        DB_HOST = "reseau.proxy.rlwy.net"
-        DB_PORT = "50112"
-        if DB_PASSWORD == "AKnk8700":
-            DB_PASSWORD = "ApmpdxSyZuvGURRprlyPTiTmMleqfbCb"
 
     SQLALCHEMY_DATABASE_URI: str = (
         f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}"
