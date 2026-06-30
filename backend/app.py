@@ -45,16 +45,22 @@ def create_app(config_class=Config) -> Flask:
     # ------------------------------------------------------------------ #
     db.init_app(app)
 
-    # Configure CORS for production (Vercel) and development
+    # Configure CORS dynamically using FRONTEND_URL environment variable
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000"
+    ]
+    frontend_url = os.environ.get("FRONTEND_URL")
+    if frontend_url:
+        allowed_origins.append(frontend_url.strip().rstrip("/"))
+
     CORS(
         app,
         resources={
             r"/api/*": {
-                "origins": [
-                    "https://hr-portal-zbnv.vercel.app",
-                    "http://localhost:3000",
-                    "http://127.0.0.1:3000"
-                ],
+                "origins": allowed_origins,
                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
                 "allow_headers": ["Content-Type", "Authorization"],
                 "supports_credentials": True
