@@ -45,8 +45,22 @@ def create_app(config_class=Config) -> Flask:
     # ------------------------------------------------------------------ #
     db.init_app(app)
 
-    # Allow all origins in dev; restrict to your frontend domain in production
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Configure CORS for production (Vercel) and development
+    CORS(
+        app,
+        resources={
+            r"/api/*": {
+                "origins": [
+                    "https://hr-portal-zbnv.vercel.app",
+                    "http://localhost:3000",
+                    "http://127.0.0.1:3000"
+                ],
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"],
+                "supports_credentials": True
+            }
+        }
+    )
 
     # ------------------------------------------------------------------ #
     # Ensure uploads directory exists
