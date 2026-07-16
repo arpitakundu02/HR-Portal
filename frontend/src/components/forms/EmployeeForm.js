@@ -73,7 +73,7 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
           </div>
         ) : (
           <div className="form-group">
-            <label className="form-label">Role</label>
+            <label className="form-label">Role <span className="form-required">*</span></label>
             <input className="form-control" name="role" value={form.role} readOnly disabled />
           </div>
         )}
@@ -101,7 +101,7 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
             onChange={change} required placeholder="e.g. Rajesh Kumar" />
         </div>
         <div className="form-group">
-          <label className="form-label">Father's Name</label>
+          <label className="form-label">Father's Name <span className="form-required">*</span></label>
           <input className="form-control" name="fathers_name" value={form.fathers_name} onChange={change} />
         </div>
       </div>
@@ -113,7 +113,7 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
             onChange={change} required placeholder="employee@company.com" />
         </div>
         <div className="form-group">
-          <label className="form-label">{isEdit ? 'New Password (leave blank to keep)' : 'Password *'}</label>
+          <label className="form-label">{isEdit ? 'New Password (leave blank to keep)' : <>Password <span className="form-required">*</span></>}</label>
           <div className="password-input-wrapper">
             <input className="form-control" type={showPassword ? "text" : "password"} name="password" value={form.password}
               onChange={change} required={!isEdit} placeholder={isEdit ? 'Leave blank to keep current' : 'Min 6 characters'} />
@@ -132,11 +132,11 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
       {/* Personal */}
       <div className="form-row">
         <div className="form-group">
-          <label className="form-label">Date of Birth</label>
+          <label className="form-label">Date of Birth <span className="form-required">*</span></label>
           <input className="form-control" type="date" name="dob" value={form.dob} onChange={change} />
         </div>
         <div className="form-group">
-          <label className="form-label">Blood Group</label>
+          <label className="form-label">Blood Group <span className="form-required">*</span></label>
           <select className="form-control" name="blood_group" value={form.blood_group} onChange={change}>
             <option value="">Select</option>
             {BLOOD_GROUPS.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
@@ -147,25 +147,25 @@ export default function EmployeeForm({ initialData, departments, onSubmit, onCan
       {/* Employment */}
       <div className="form-row">
         <div className="form-group">
-          <label className="form-label">Department</label>
+          <label className="form-label">Department <span className="form-required">*</span></label>
           <select className="form-control" name="department_id" value={form.department_id} onChange={change}>
             <option value="">Select Department</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
         <div className="form-group">
-          <label className="form-label">Rank / Designation</label>
+          <label className="form-label">Rank / Designation <span className="form-required">*</span></label>
           <input className="form-control" name="rank" value={form.rank} onChange={change} placeholder="e.g. Senior Analyst" />
         </div>
       </div>
 
       <div className="form-row">
         <div className="form-group">
-          <label className="form-label">Date of Joining</label>
+          <label className="form-label">Date of Joining <span className="form-required">*</span></label>
           <input className="form-control" type="date" name="date_of_joining" value={form.date_of_joining} onChange={change} />
         </div>
         <div className="form-group">
-          <label className="form-label">Salary (₹)</label>
+          <label className="form-label">Salary (₹) <span className="form-required">*</span></label>
           <input className="form-control" type="number" name="salary" value={form.salary} onChange={change} placeholder="e.g. 50000" />
         </div>
       </div>

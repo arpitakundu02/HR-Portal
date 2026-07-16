@@ -21,6 +21,13 @@ def register():
     """
     Public route: Submit employee registration request.
     """
+    from models import SystemSetting
+    
+    # Check self-registration toggle
+    enable_self_reg = SystemSetting.get_value("enable_self_registration", True, bool)
+    if not enable_self_reg:
+        return jsonify({"error": "Self-registration is currently disabled."}), 403
+
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
@@ -28,6 +35,11 @@ def register():
 
     if not email or not password or not name:
         return jsonify({"error": "Email, password, and name are required."}), 422
+
+    # Check minimum password length
+    min_pwd_len = SystemSetting.get_value("min_password_length", 8, int)
+    if len(password) < min_pwd_len:
+        return jsonify({"error": f"Password must be at least {min_pwd_len} characters long."}), 422
 
     # Check duplicate email in users or registration_requests
     if User.query.filter_by(email=email).first():
@@ -84,6 +96,7 @@ def action_request(req_id, current_user_id, current_user_role):
     On approval: creates employee account with hashed passwords and sequential employee_id.
     On rejection: saves rejection reason.
     """
+    from models import SystemSetting
     req = RegistrationRequest.query.get_or_404(req_id)
 
     if req.status != "Pending":
@@ -131,8 +144,12 @@ def action_request(req_id, current_user_id, current_user_role):
 
             # Initialize leave balances
             gender = emp.gender or "Male"
-            apl_allocated = 20
-            wfh_allocated = 5 if gender == "Female" else 4
+            apl_val = SystemSetting.get_value("apl_allocation", 20, int)
+            wfh_m_val = SystemSetting.get_value("wfh_limit_male", 4, int)
+            wfh_f_val = SystemSetting.get_value("wfh_limit_female", 5, int)
+            
+            apl_allocated = apl_val
+            wfh_allocated = wfh_f_val if gender == "Female" else wfh_m_val
 
             db.session.add(LeaveBalance(
                 employee_id=emp.id,

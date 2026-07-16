@@ -581,6 +581,10 @@ def action_regularization(id, current_user_id, current_user_role):
     if not req:
         return jsonify({"error": "Regularization request not found."}), 404
 
+    employee = User.query.get(req.employee_id)
+    if not employee or not employee.is_active:
+        return jsonify({"error": "Cannot approve regularization for inactive employees."}), 400
+
     if req.employee_id == current_user_id:
         return jsonify({"error": "Access denied. You cannot approve your own regularization request."}), 403
 

@@ -93,9 +93,23 @@ def seed_settings(app):
     from datetime import datetime
     with app.app_context():
         defaults = {
+            "company_name": "HR Portal Inc.",
+            "company_email": "info@hrportal.com",
+            "company_phone": "+1 555-0199",
+            "company_address": "123 Tech Avenue, Silicon Valley, CA",
+            "apl_allocation": "20",
+            "wfh_limit_male": "4",
+            "wfh_limit_female": "5",
             "office_latitude": str(app.config.get("OFFICE_LATITUDE", 28.6139)),
             "office_longitude": str(app.config.get("OFFICE_LONGITUDE", 77.2090)),
             "office_radius_meters": str(app.config.get("OFFICE_RADIUS_METERS", 200)),
+            "standard_working_hours": "9",
+            "min_password_length": "8",
+            "session_timeout": "30",
+            "enable_self_registration": "true",
+            "enable_email_notifications": "true",
+            "enable_attendance_reminders": "true",
+            "enable_leave_approval_emails": "true",
             "office_updated_by_name": "System Seeder",
             "office_updated_at": datetime.utcnow().isoformat()
         }
@@ -119,6 +133,28 @@ def seed_policies(app):
             except Exception as e:
                 print(f"[!] Failed to seed policies: {e}")
 
+
+def run_migrations(app):
+    """Run alter queries to add deleted_at and deleted_by to users table if they don't exist."""
+    from sqlalchemy import text
+    with app.app_context():
+        try:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN deleted_at DATETIME NULL"))
+            db.session.commit()
+            print("[✓] Column 'deleted_at' added to 'users' table.")
+        except Exception:
+            db.session.rollback()
+
+        try:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN deleted_by INT NULL"))
+            db.session.commit()
+            db.session.execute(text("ALTER TABLE users ADD CONSTRAINT fk_users_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL"))
+            db.session.commit()
+            print("[✓] Column 'deleted_by' added to 'users' table.")
+        except Exception:
+            db.session.rollback()
+
+
 def main():
     app = create_app()
 
@@ -127,6 +163,7 @@ def main():
         db.create_all()
         print("[✓] Tables created.")
 
+    run_migrations(app)
     seed_departments(app)
     seed_admin(app)
     seed_settings(app)

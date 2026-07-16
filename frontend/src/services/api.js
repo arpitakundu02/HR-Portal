@@ -58,6 +58,7 @@ export const getEmployee    = (id)          => api.get(`/employees/${id}`);
 export const createEmployee = (data)        => api.post('/employees/', data);
 export const updateEmployee = (id, data)    => api.put(`/employees/${id}`, data);
 export const deleteEmployee = (id)          => api.delete(`/employees/${id}`);
+export const restoreEmployee = (id)         => api.post(`/employees/${id}/restore`);
 
 export const uploadResume = (id, formData) =>
   api.post(`/employees/${id}/resume`, formData, {
@@ -103,6 +104,8 @@ export const getAttendanceHistory = (params)  => api.get('/attendance/history', 
 export const getAttendanceStats   = ()         => api.get('/attendance/stats');
 export const getOfficeSettings    = ()        => api.get('/attendance/settings');
 export const updateOfficeSettings = (data)    => api.post('/attendance/settings', data);
+export const getSystemSettings    = ()        => api.get('/settings');
+export const updateSystemSettings = (data)    => api.post('/settings', data);
 
 /* ================================================================
    MEETINGS

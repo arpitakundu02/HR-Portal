@@ -9,7 +9,7 @@ import EmployeeForm from '../components/forms/EmployeeForm';
 import { useToast } from '../components/common/Toast';
 import {
   getEmployees, createEmployee, updateEmployee, deleteEmployee,
-  getDepartments, uploadResume, getEmployeeDashboardDetails,
+  getDepartments, uploadResume, getEmployeeDashboardDetails, restoreEmployee
 } from '../services/api';
 import { EditIcon, TrashIcon, PaperclipIcon, PlusIcon, UploadIcon, UsersIcon } from '../components/common/Icons';
 
@@ -29,6 +29,11 @@ export default function Employees() {
   const [deptFilter,   setDeptFilter]   = useState('');
   const [loading,      setLoading]      = useState(true);
   const [formLoading,  setFormLoading]  = useState(false);
+
+  // Filter and Confirm States
+  const [statusFilter, setStatusFilter] = useState('Active'); // Active | Inactive | All
+  const [showRestore,   setShowRestore]   = useState(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Modals
   const [showForm,     setShowForm]     = useState(false);
@@ -70,6 +75,7 @@ export default function Employees() {
         page, per_page: 15,
         search: search || undefined,
         department: deptFilter || undefined,
+        status: isAdmin ? statusFilter : undefined,
       });
       setEmployees(data.employees);
       setTotal(data.total);
@@ -80,7 +86,7 @@ export default function Employees() {
       setLoading(false);
     }
     // eslint-disable-next-line
-  }, [page, search, deptFilter]);
+  }, [page, search, deptFilter, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -88,7 +94,7 @@ export default function Employees() {
   useEffect(() => {
     const t = setTimeout(() => setPage(1), 400);
     return () => clearTimeout(t);
-  }, [search, deptFilter]);
+  }, [search, deptFilter, statusFilter]);
 
   const handleSubmit = async (formData) => {
     setFormLoading(true);
@@ -111,13 +117,29 @@ export default function Employees() {
   };
 
   const handleDelete = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast.error('Please type DELETE to confirm.');
+      return;
+    }
     try {
       await deleteEmployee(showDelete.id);
       toast.success(`${showDelete.name} has been deactivated.`);
       setShowDelete(null);
+      setDeleteConfirmText('');
       load();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Delete failed.');
+    }
+  };
+
+  const handleRestore = async () => {
+    try {
+      await restoreEmployee(showRestore.id);
+      toast.success(`${showRestore.name} has been restored.`);
+      setShowRestore(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Restore failed.');
     }
   };
 
@@ -152,8 +174,8 @@ export default function Employees() {
       </div>
 
       {/* Search & Filter */}
-      <div className="search-filter-row">
-        <div className="search-input-wrap">
+      <div className="search-filter-row" style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="search-input-wrap" style={{ flex: 1, minWidth: 240 }}>
           <span className="search-icon">🔍</span>
           <input
             className="form-control"
@@ -167,10 +189,26 @@ export default function Employees() {
             className="form-control filter-select"
             value={deptFilter}
             onChange={(e) => { setDeptFilter(e.target.value); setPage(1); }}
+            style={{ maxWidth: 200 }}
           >
             <option value="">All Departments</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
+        )}
+        {isAdmin && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Employee Status:</span>
+            <select
+              className="form-control filter-select"
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              style={{ maxWidth: 150 }}
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="All">All</option>
+            </select>
+          </div>
         )}
       </div>
 
@@ -218,7 +256,7 @@ export default function Employees() {
                     </tr>
                   )}
                   {employees.map((emp) => (
-                    <tr key={emp.id}>
+                    <tr key={emp.id} style={!emp.is_active ? { opacity: 0.6, backgroundColor: 'rgba(0,0,0,0.02)' } : {}}>
                       {canManage ? (
                         <>
                           <td className="td-muted">{emp.employee_id}</td>
@@ -254,12 +292,19 @@ export default function Employees() {
                           <td><Badge status={emp.is_active ? 'Active' : 'Inactive'} /></td>
                           <td>
                             <div className="table-actions">
-                              {emp.role !== 'Admin' && (
+                              {emp.is_active && (
                                 <>
-                                  <button className="btn btn-secondary btn-sm" onClick={() => { setEditTarget(emp); setShowForm(true); }} title="Edit"><EditIcon /></button>
-                                  <button className="btn btn-ghost btn-sm" onClick={() => setShowResume(emp)} title="Upload Resume"><PaperclipIcon /></button>
-                                  <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(emp)} title="Deactivate"><TrashIcon /></button>
+                                  {emp.role !== 'Admin' && (
+                                    <>
+                                      <button className="btn btn-secondary btn-sm" onClick={() => { setEditTarget(emp); setShowForm(true); }} title="Edit"><EditIcon /></button>
+                                      <button className="btn btn-ghost btn-sm" onClick={() => setShowResume(emp)} title="Upload Resume"><PaperclipIcon /></button>
+                                    </>
+                                  )}
+                                  <button className="btn btn-danger btn-sm" onClick={() => { setDeleteConfirmText(''); setShowDelete(emp); }} title="Delete Employee"><TrashIcon /></button>
                                 </>
+                              )}
+                              {!emp.is_active && (
+                                <button className="btn btn-success btn-sm" onClick={() => setShowRestore(emp)} title="Restore Employee">Restore</button>
                               )}
                             </div>
                           </td>
@@ -328,14 +373,63 @@ export default function Employees() {
       </Modal>
 
       {/* Delete Confirm Modal */}
-      <Modal isOpen={!!showDelete} onClose={() => setShowDelete(null)} title="Deactivate Employee" size="sm">
-        <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
-          Are you sure you want to deactivate <strong>{showDelete?.name}</strong>?
-          This will revoke their access to the portal.
+      <Modal isOpen={!!showDelete} onClose={() => { setShowDelete(null); setDeleteConfirmText(''); }} title="Delete Employee" size="md">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: 'var(--bg-elevated)', padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+            {showDelete?.photo_url ? (
+              <img src={showDelete.photo_url} alt={showDelete.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: 'var(--border)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 16 }}>
+                {showDelete?.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h4 style={{ margin: 0, fontWeight: 700 }}>{showDelete?.name}</h4>
+              <p style={{ margin: '2px 0 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
+                ID: {showDelete?.employee_id} &middot; {showDelete?.role} &middot; {showDelete?.department_name || 'No Dept'}
+              </p>
+              <p style={{ margin: '2px 0 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+                Joined: {showDelete?.date_of_joining || '—'} &middot; Status: {showDelete?.is_active ? 'Active' : 'Inactive'}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 16px', background: '#fef2f2', borderLeft: '4px solid #dc2626', borderRadius: 'var(--radius)', fontSize: 13, color: '#991b1b', lineHeight: 1.5 }}>
+            <strong>Warning:</strong> This employee will no longer be able to access the HR Portal. Historical records (attendance, leaves, tasks, meetings, approvals, timesheets, etc.) will remain preserved.
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ fontWeight: 600 }}>Type <span style={{ color: '#dc2626' }}>DELETE</span> to confirm deactivation</label>
+            <input
+              className="form-control"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+            />
+          </div>
+
+          <div className="form-actions">
+            <button className="btn btn-secondary" onClick={() => { setShowDelete(null); setDeleteConfirmText(''); }}>Cancel</button>
+            <button
+              className="btn btn-danger"
+              onClick={handleDelete}
+              disabled={deleteConfirmText !== 'DELETE'}
+            >
+              <TrashIcon style={{ marginRight: 6 }} /> Delete Employee
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Restore Confirm Modal */}
+      <Modal isOpen={!!showRestore} onClose={() => setShowRestore(null)} title="Restore Employee" size="sm">
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
+          Are you sure you want to restore <strong>{showRestore?.name}</strong>?
+          This will reactivate their login and restore their visibility in active directories while preserving all historical data.
         </p>
         <div className="form-actions">
-          <button className="btn btn-secondary" onClick={() => setShowDelete(null)}>Cancel</button>
-          <button className="btn btn-danger" onClick={handleDelete}><TrashIcon style={{ marginRight: 6 }} /> Deactivate</button>
+          <button className="btn btn-secondary" onClick={() => setShowRestore(null)}>Cancel</button>
+          <button className="btn btn-success" onClick={handleRestore}>Restore</button>
         </div>
       </Modal>
 

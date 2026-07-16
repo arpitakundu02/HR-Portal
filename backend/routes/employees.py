@@ -116,7 +116,17 @@ def list_employees(current_user_id, current_user_role):
     is_lm = getattr(user, 'is_line_manager', False) if user else False
     user_dept_id = user.department_id if user else None
 
-    query = User.query.filter_by(is_active=True)
+    status_filter = request.args.get("status", "Active").strip() # Active | Inactive | All
+
+    if current_user_role == "Admin":
+        if status_filter == "Inactive":
+            query = User.query.filter_by(is_active=False)
+        elif status_filter == "All":
+            query = User.query
+        else:
+            query = User.query.filter_by(is_active=True)
+    else:
+        query = User.query.filter_by(is_active=True)
 
     if current_user_role != "Admin":
         if is_lm:
@@ -413,9 +423,14 @@ def create_employee(current_user_id, current_user_role):
     db.session.flush()  # Flush to get employee.id for leave balances
 
     # Initialise leave balances (APL and WFH) for the new employee
+    from models import SystemSetting
     gender = employee.gender or "Male"
-    apl_allocated = 20
-    wfh_allocated = 5 if gender == "Female" else 4
+    apl_val = SystemSetting.get_value("apl_allocation", 20, int)
+    wfh_m_val = SystemSetting.get_value("wfh_limit_male", 4, int)
+    wfh_f_val = SystemSetting.get_value("wfh_limit_female", 5, int)
+    
+    apl_allocated = apl_val
+    wfh_allocated = wfh_f_val if gender == "Female" else wfh_m_val
 
     db.session.add(LeaveBalance(
         employee_id=employee.id,
@@ -513,6 +528,8 @@ def update_employee(emp_id, current_user_id, current_user_role):
                 (address, current_address, emergency_contact).
     """
     employee = User.query.get_or_404(emp_id)
+    if not employee.is_active:
+        return jsonify({"error": "Inactive employees cannot be edited."}), 400
     if employee.role == "Admin" and current_user_id != emp_id:
         return jsonify({"error": "Editing other Admin accounts is not allowed."}), 403
 
@@ -575,6 +592,10 @@ def update_employee(emp_id, current_user_id, current_user_role):
 
         # Allow password reset by admin or line manager
         if data.get("password"):
+            from models import SystemSetting
+            min_pwd_len = SystemSetting.get_value("min_password_length", 8, int)
+            if len(data["password"]) < min_pwd_len:
+                return jsonify({"error": f"Password must be at least {min_pwd_len} characters long."}), 422
             employee.password_hash = bcrypt.hashpw(
                 data["password"].encode("utf-8"), bcrypt.gensalt()
             ).decode("utf-8")
@@ -596,21 +617,39 @@ def update_employee(emp_id, current_user_id, current_user_role):
 @admin_required
 def delete_employee(emp_id, current_user_id, current_user_role):
     """Admin-only: Soft-delete an employee (sets is_active = False)."""
-    from models import Department
     employee = User.query.get_or_404(emp_id)
-    if employee.id == current_user_id:
-        return jsonify({"error": "Admin cannot deactivate their own account."}), 400
+
+    # Prevent deactivating the last active Admin
+    if employee.role == "Admin":
+        active_admins = User.query.filter_by(role="Admin", is_active=True).count()
+        if active_admins <= 1:
+            return jsonify({"error": "Operation blocked. At least one active administrator must remain in the system."}), 400
 
     employee.is_active = False
-    
-    # Safely handle direct reports by setting their manager to NULL
-    User.query.filter_by(manager_id=employee.id).update({User.manager_id: None})
-    
-    # Safely handle department manager references by setting them to NULL
-    Department.query.filter_by(manager_id=employee.id).update({Department.manager_id: None})
+    employee.deleted_at = datetime.utcnow()
+    employee.deleted_by = current_user_id
     
     db.session.commit()
     return jsonify({"message": f"Employee '{employee.name}' has been deactivated."}), 200
+
+
+# ------------------------------------------------------------------
+# POST /api/employees/<id>/restore
+# ------------------------------------------------------------------
+@employees_bp.route("/<int:emp_id>/restore", methods=["POST"])
+@admin_required
+def restore_employee(emp_id, current_user_id, current_user_role):
+    """Admin-only: Restore a soft-deleted employee (sets is_active = True)."""
+    employee = User.query.get_or_404(emp_id)
+    if employee.is_active:
+        return jsonify({"error": "Employee is already active."}), 400
+
+    employee.is_active = True
+    employee.deleted_at = None
+    employee.deleted_by = None
+    
+    db.session.commit()
+    return jsonify({"message": f"Employee '{employee.name}' has been restored.", "employee": employee.to_dict()}), 200
 
 
 # ------------------------------------------------------------------

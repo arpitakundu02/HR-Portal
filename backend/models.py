@@ -83,10 +83,12 @@ class User(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
     # Relationships
     department = db.relationship("Department", back_populates="employees", foreign_keys=[department_id])
-    manager = db.relationship("User", remote_side=[id], backref=db.backref("reports", lazy="dynamic"))
+    manager = db.relationship("User", remote_side=[id], foreign_keys=[manager_id], backref=db.backref("reports", lazy="dynamic", foreign_keys=[manager_id]))
     leave_balances = db.relationship("LeaveBalance", back_populates="employee", lazy="dynamic", cascade="all, delete-orphan")
     leaves = db.relationship("Leave", foreign_keys="Leave.employee_id", back_populates="employee", lazy="dynamic", cascade="all, delete-orphan")
     attendance_records = db.relationship("Attendance", back_populates="employee", lazy="dynamic", cascade="all, delete-orphan")
@@ -120,6 +122,8 @@ class User(db.Model):
             "experience_summary": self.experience_summary,
             "gender": self.gender,
             "is_active": self.is_active,
+            "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
+            "deleted_by": self.deleted_by,
             "created_at": self.created_at.isoformat(),
         }
         if include_sensitive:
@@ -356,6 +360,18 @@ class SystemSetting(db.Model):
 
     key = db.Column(db.String(100), primary_key=True)
     value = db.Column(db.String(255), nullable=False)
+
+    @classmethod
+    def get_value(cls, key, default=None, type_cast=str):
+        try:
+            setting = cls.query.filter_by(key=key).first()
+            if setting:
+                if type_cast == bool:
+                    return setting.value.lower() == 'true'
+                return type_cast(setting.value)
+        except Exception:
+            pass
+        return default
 
     def to_dict(self):
         return {

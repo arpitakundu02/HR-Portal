@@ -336,6 +336,9 @@ def action_leave(leave_id, current_user_id, current_user_role):
         return jsonify({"error": "'status' must be 'Approved' or 'Rejected'."}), 422
 
     leave = Leave.query.get_or_404(leave_id)
+    employee = User.query.get(leave.employee_id)
+    if not employee or not employee.is_active:
+        return jsonify({"error": "Cannot approve or action leaves for inactive employees."}), 400
 
     if leave.employee_id == current_user_id:
         return jsonify({"error": "Access denied. You cannot approve your own leave request."}), 403

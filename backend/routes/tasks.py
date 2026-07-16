@@ -247,6 +247,9 @@ def update_task(task_id, current_user_id, current_user_role):
         if "description" in data:
             task.description = data["description"]
         if "employee_id" in data:
+            emp = User.query.get(data["employee_id"])
+            if not emp or not emp.is_active:
+                return jsonify({"error": "Cannot assign tasks to inactive employees."}), 400
             task.employee_id = data["employee_id"]
         if "due_date" in data:
             try:

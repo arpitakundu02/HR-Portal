@@ -33,6 +33,7 @@ from routes.timesheets import timesheets_bp
 from routes.team_dashboard import team_dashboard_bp
 from routes.hierarchy import hierarchy_bp
 from routes.policies import policies_bp
+from routes.settings import settings_bp
 
 
 def create_app(config_class=Config) -> Flask:
@@ -97,6 +98,7 @@ def create_app(config_class=Config) -> Flask:
     app.register_blueprint(team_dashboard_bp, url_prefix="/api/team-dashboard")
     app.register_blueprint(hierarchy_bp,       url_prefix="/api/hierarchy")
     app.register_blueprint(policies_bp,        url_prefix="/api/policies")
+    app.register_blueprint(settings_bp,        url_prefix="/api/settings")
 
     # ------------------------------------------------------------------ #
     # Health check

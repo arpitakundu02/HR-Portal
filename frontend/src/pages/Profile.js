@@ -8,11 +8,12 @@ import { useAuth } from '../context/AuthContext';
 import Spinner from '../components/common/Spinner';
 import Badge from '../components/common/Badge';
 import { useToast } from '../components/common/Toast';
-import { getMe, updateEmployee, uploadResume, uploadPhoto, deletePhoto, getDepartments } from '../services/api';
+import { getMe, updateEmployee, uploadResume, uploadPhoto, deletePhoto, getDepartments, deleteEmployee } from '../services/api';
 import { EditIcon, DownloadIcon, UploadIcon, SaveIcon, LockIcon, EyeIcon, EyeOffIcon, CameraIcon, TrashIcon } from '../components/common/Icons';
+import Modal from '../components/common/Modal';
 
 export default function Profile() {
-  const { user, updateUser, isAdmin } = useAuth();
+  const { user, updateUser, isAdmin, logout } = useAuth();
   const toast = useToast();
 
   const [profile,  setProfile]  = useState(null);
@@ -22,6 +23,11 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [departments, setDepartments] = useState([]);
+
+  // Self deletion states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingSelf, setDeletingSelf] = useState(false);
 
   // Editable fields
   const [form, setForm] = useState({
@@ -160,6 +166,24 @@ export default function Profile() {
     } catch (err) {
       toast.error(err.response?.data?.error || 'Password change failed.');
     } finally { setPwSaving(false); }
+  };
+
+  const handleDeleteSelf = async () => {
+    if (deleteConfirmText !== 'DELETE MY ACCOUNT') {
+      toast.error('Please type DELETE MY ACCOUNT to confirm.');
+      return;
+    }
+    setDeletingSelf(true);
+    try {
+      await deleteEmployee(profile.id);
+      toast.success('Your account has been deleted. Logging out...');
+      logout();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete account.');
+    } finally {
+      setDeletingSelf(false);
+      setShowDeleteModal(false);
+    }
   };
 
   if (loading) return <Spinner />;
@@ -484,6 +508,28 @@ export default function Profile() {
           )}
         </div>
 
+        {isAdmin && (
+          <div className="card" style={{ border: '1px solid var(--danger-border, #fecaca)' }}>
+            <div className="card-header">
+              <div className="card-title" style={{ color: 'var(--danger, #dc2626)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                ⚠️ Danger Zone
+              </div>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, marginBottom: 16 }}>
+              Deleting your account is permanent. You will immediately lose access to the system.
+            </p>
+            <button
+              className="btn btn-danger"
+              onClick={() => {
+                setDeleteConfirmText('');
+                setShowDeleteModal(true);
+              }}
+            >
+              Delete My Account
+            </button>
+          </div>
+        )}
+
         {/* Professional Profile Card */}
         <div className="card" style={{ gridColumn: 'span 2' }}>
           <div className="card-header">
@@ -517,6 +563,43 @@ export default function Profile() {
           )}
         </div>
       </div>
+
+      {/* Self-Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Your Account?"
+        size="sm"
+      >
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
+          Are you sure you want to delete your administrator account? 
+          <strong> You will immediately lose access to the HR Portal</strong> and will be logged out. 
+          Historical records will remain preserved.
+        </p>
+        <div className="form-group" style={{ marginBottom: 20 }}>
+          <label className="form-label" style={{ fontWeight: 600 }}>
+            Type <span style={{ color: 'var(--danger, #dc2626)' }}>DELETE MY ACCOUNT</span> to confirm
+          </label>
+          <input
+            className="form-control"
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="DELETE MY ACCOUNT"
+          />
+        </div>
+        <div className="form-actions">
+          <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)} disabled={deletingSelf}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-danger"
+            onClick={handleDeleteSelf}
+            disabled={deleteConfirmText !== 'DELETE MY ACCOUNT' || deletingSelf}
+          >
+            {deletingSelf ? 'Deleting Account...' : 'Delete My Account'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
